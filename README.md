@@ -2,7 +2,9 @@
 
 一个**纯静态、零依赖、可离线**的高中化学 3D 结构模型库，共 **97 个交互式模型**，打开网页即可用鼠标旋转、滚轮缩放，适合课堂投屏与课后自学。
 
-> 在线访问：<https://zhanzhengyang0-sys.github.io/3d-chemistry-modle/>
+> 在线访问：<https://zhanzhengyang0-sys.github.io/3d-chemistry-modle-new/>
+>
+> 仓库地址：<https://github.com/zhanzhengyang0-sys/3d-chemistry-modle-new>
 
 ---
 
@@ -46,7 +48,7 @@
 
 本站通过 **GitHub Pages** 发布，源为 `main` 分支根目录：
 
-- 访问地址：`https://<用户名>.github.io/<仓库名>/`
+- 访问地址：<https://zhanzhengyang0-sys.github.io/3d-chemistry-modle-new/>
 - 所有页面内部链接均为**相对路径**，因此放在仓库子路径下也能正常工作；
 - `.nojekyll` 用于跳过 Jekyll 构建，避免静态资源被额外处理。
 
