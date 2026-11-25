@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D 元素周期表 - 全触屏适配</title>
+    <style>
+        /* 禁止浏览器默认滚动、滑动、缩放行为，避免与3D操控冲突 */
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #eef2f5; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none; 
+            position: fixed; /* 防止移动端滚动条 */
+            width: 100%;
+            height: 100%;
+        }
+
+        .label-3d {
+            color: #111;
+            font-weight: 800;
+            text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
+            pointer-events: none;
+            user-select: none;
+            text-align: center;
+            transition: opacity 0.2s ease;
+        }
+        .label-3d .element { font-size: 17px; }
+        .label-3d .value { font-size: 12px; font-weight: 600; }
+        
+        .edge-label {
+            color: #1e293b;
+            font-weight: bold;
+            font-size: 16px;
+            text-shadow: 0px 0px 4px rgba(255,255,255,0.8);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* 居中的控制条 - 自适应长宽 */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%; /* 默认占90%宽度 */
+            max-width: 500px; 
+            padding: 6px 16px;
+            height: 44px; /* 为触屏增加一点高度 */
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(6px);
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            z-index: 200;
+            box-sizing: border-box;
+        }
+        
+        #controls select {
+            flex: 1; /* 自动拉伸填补空间 */
+            padding: 4px 6px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.25);
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            font-size: 14px; /* 触屏文字稍大 */
+            font-weight: normal;
+            cursor: pointer;
+            outline: none;
+            height: 32px; /* 触屏下拉菜单高度 */
+            min-width: 60px;
+            appearance: auto; /* 确保移动端保留原生下拉样式，方便触控 */
+        }
+        #controls select option {
+            background: #222;
+            color: #fff;
+        }
+        #controls select:focus { border-color: #ffffff; }
+        
+        #controls .btn-reset {
+            padding: 0 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 13px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            line-height: 1;
+            transition: background 0.2s;
+            white-space: nowrap; /* 防止文字换行 */
+        }
+        #controls .btn-reset:hover { background: rgba(255, 255, 255, 0.3); }
+        
+        /* 竖屏手机特化：非常窄的宽度 */
+        @media (max-width: 600px) and (orientation: portrait) {
+            #controls { max-width: 95%; padding: 4px 10px; gap: 4px; height: 48px; }
+            #controls select { font-size: 13px; padding: 0 4px; min-width: 40px; height: 34px; }
+        }
+    </style>
+
+    </head>
+<body>
+    <div id="controls">
+        <select id="groupFilter">
+            <option value="all">全部</option>
+            <option value="1">IA</option>
+            <option value="2">IIA</option>
+            <option value="13">IIIA</option>
+            <option value="14">IVA</option>
+            <option value="15">VA</option>
+            <option value="16">VIA</option>
+            <option value="17">VIIA</option>
+            <option value="18">0</option>
+        </select>
+        
+        <select id="periodFilter">
+            <option value="all">全部</option>
+            <option value="1">一</option>
+            <option value="2">二</option>
+            <option value="3">三</option>
+            <option value="4">四</option>
+            <option value="5">五</option>
+            <option value="6">六</option>
+        </select>
+
+        <button class="btn-reset" id="resetFilterBtn">重置</button>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        const groupColors = {
+            1: '#F5A3A3', 2: '#A3D8D8', 13: '#F2E29E', 14: '#D3CFB1',
+            15: '#89C4CD', 16: '#94CFC5', 17: '#A7D4B4', 18: '#D2ACD9'
+        };
+
+        const elementsData = [
+            { r: 1, g: 1,  s: 'H',  v: 1311 }, { r: 1, g: 18, s: 'He', v: 2372 },
+            { r: 2, g: 1,  s: 'Li', v: 520 }, { r: 2, g: 2,  s: 'Be', v: 899 },
+            { r: 2, g: 13, s: 'B',  v: 800 }, { r: 2, g: 14, s: 'C',  v: 1086 },
+            { r: 2, g: 15, s: 'N',  v: 1402 }, { r: 2, g: 16, s: 'O',  v: 1314 },
+            { r: 2, g: 17, s: 'F',  v: 1681 }, { r: 2, g: 18, s: 'Ne', v: 2080 },
+            { r: 3, g: 1,  s: 'Na', v: 496 }, { r: 3, g: 2,  s: 'Mg', v: 738 },
+            { r: 3, g: 13, s: 'Al', v: 577 }, { r: 3, g: 14, s: 'Si', v: 786 },
+            { r: 3, g: 15, s: 'P',  v: 1012 }, { r: 3, g: 16, s: 'S',  v: 999 },
+            { r: 3, g: 17, s: 'Cl', v: 1256 }, { r: 3, g: 18, s: 'Ar', v: 1520 },
+            { r: 4, g: 1,  s: 'K',  v: 419 }, { r: 4, g: 2,  s: 'Ca', v: 590 },
+            { r: 4, g: 13, s: 'Ga', v: 579 }, { r: 4, g: 14, s: 'Ge', v: 761 },
+            { r: 4, g: 15, s: 'As', v: 947 }, { r: 4, g: 16, s: 'Se', v: 941 },
+            { r: 4, g: 17, s: 'Br', v: 1143 }, { r: 4, g: 18, s: 'Kr', v: 1351 },
+            { r: 5, g: 1,  s: 'Rb', v: 403 }, { r: 5, g: 2,  s: 'Sr', v: 549 },
+            { r: 5, g: 13, s: 'In', v: 558 }, { r: 5, g: 14, s: 'Sn', v: 708 },
+            { r: 5, g: 15, s: 'Sb', v: 834 }, { r: 5, g: 16, s: 'Te', v: 869 },
+            { r: 5, g: 17, s: 'I',  v: 1009 }, { r: 5, g: 18, s: 'Xe', v: 1170 },
+            { r: 6, g: 1,  s: 'Cs', v: 376 }, { r: 6, g: 2,  s: 'Ba', v: 503 },
+            { r: 6, g: 13, s: 'Tl', v: 589 }, { r: 6, g: 14, s: 'Pb', v: 715 },
+            { r: 6, g: 15, s: 'Bi', v: 703 }, { r: 6, g: 16, s: 'Po', v: 813 },
+            { r: 6, g: 17, s: 'At', v: 926 }, { r: 6, g: 18, s: 'Rn', v: 1037 },
+        ];
+
+        const colGroups = [18, 17, 16, 15, 14, 13, null, 2, 1];
+        const colLabels = ['0', 'VIIA', 'VIA', 'VA', 'IVA', 'IIIA', '', 'IIA', 'IA'];
+        const chineseNumbers = ['一', '二', '三', '四', '五', '六'];
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf4f6f8);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 2000);
+        camera.position.set(0, 18, -30); 
+        camera.zoom = 0.72; 
+        camera.updateProjectionMatrix();
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 适配Retina屏且保证性能
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.target.set(0, 4, 0);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(-10, 25, 15);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const scale = 0.012; 
+        const spacing = 2.0; 
+        const barWidth = 1.4;
+        const barDepth = 1.4;
+
+        const rows = 6;
+        const groupPosX = []; 
+        const periodPosZ = []; 
+
+        const totalCols = colGroups.length;
+        const leftEdge = -8.0; 
+        const rightEdge = leftEdge + (totalCols - 1) * spacing;
+        
+        for (let i = 0; i < totalCols; i++) {
+            const posX = leftEdge + (i * spacing); 
+            groupPosX.push(posX);
+        }
+
+        for (let r = 1; r <= rows; r++) {
+            const posZ = (r - 1) * -spacing; 
+            periodPosZ.push(posZ);
+        }
+
+        const extendAmount = 2.4; 
+        const planeWidth = (rightEdge - leftEdge) + (extendAmount * 2);
+        const planeDepth = (periodPosZ[0] - periodPosZ[rows-1]) + (extendAmount * 2);
+        
+        const floorMat = new THREE.MeshBasicMaterial({
+            color: 0x93c5fd,
+            transparent: true,
+            opacity: 0.30,
+            side: THREE.DoubleSide
+        });
+        const floorGeo = new THREE.PlaneGeometry(planeWidth, planeDepth);
+        const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+        floorMesh.position.set((leftEdge + rightEdge) / 2, -0.05, (periodPosZ[0] + periodPosZ[rows-1]) / 2);
+        floorMesh.rotation.x = -Math.PI / 2;
+        floorMesh.receiveShadow = true;
+        scene.add(floorMesh);
+
+        const gridMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.00 });
+        const gridGeo = new THREE.PlaneGeometry(spacing * 0.85, spacing * 0.85);
+        for (let r = 1; r <= rows; r++) {
+            const posZ = periodPosZ[r-1];
+            colGroups.forEach((g, i) => {
+                if (g === null) return; 
+                const posX = groupPosX[i];
+                const grid = new THREE.Mesh(gridGeo, gridMat);
+                grid.position.set(posX, -0.01, posZ);
+                grid.rotation.x = -Math.PI / 2;
+                scene.add(grid);
+            });
+        }
+
+        const allBars = []; 
+        const allLabels = [];
+
+        elementsData.forEach(el => {
+            let colIdx = colGroups.indexOf(el.g);
+            if (colIdx === -1) return;
+
+            const posX = groupPosX[colIdx];
+            const posZ = periodPosZ[el.r - 1]; 
+            const height = el.v * scale;
+
+            const hexColor = groupColors[el.g] || '#999'; 
+
+            const geometry = new THREE.BoxGeometry(barWidth, height, barDepth);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: hexColor, 
+                roughness: 0.2, 
+                metalness: 0.05,
+                transparent: true, 
+                opacity: 1.0
+            });
+            const bar = new THREE.Mesh(geometry, material);
+            bar.castShadow = true;
+            bar.receiveShadow = true;
+            bar.position.set(posX, height / 2, posZ);
+            bar.userData = { r: el.r, g: el.g };
+            scene.add(bar);
+            allBars.push(bar);
+
+            const div = document.createElement('div');
+            div.className = 'label-3d';
+            div.innerHTML = `<div class="element">${el.s}</div><div class="value">${el.v}</div>`;
+            const label = new CSS2DObject(div);
+            label.position.set(posX, height + 0.4, posZ);
+            label.userData = { r: el.r, g: el.g };
+            scene.add(label);
+            allLabels.push(label);
+        });
+
+        const createEdgeLabel = (text, x, y, z, size = '16px') => {
+            if (text === '') return; 
+            const div = document.createElement('div');
+            div.textContent = text;
+            div.className = 'edge-label';
+            div.style.fontSize = size;
+            const label = new CSS2DObject(div);
+            label.position.set(x, y, z);
+            scene.add(label);
+        };
+        
+        const yLabel = -0.05;
+        const offset = 4.2; 
+
+        const zFront = periodPosZ[rows-1] + extendAmount - offset; 
+        groupPosX.forEach((x, i) => {
+            createEdgeLabel(colLabels[i], x, yLabel, zFront, '16px');
+        });
+
+        const zBack = periodPosZ[0] - extendAmount + offset;
+        groupPosX.forEach((x, i) => {
+            createEdgeLabel(colLabels[i], x, yLabel, zBack, '16px');
+        });
+
+        const xLeft = leftEdge - extendAmount;
+        periodPosZ.forEach((z, i) => {
+            createEdgeLabel(chineseNumbers[i], xLeft, yLabel, z, '16px');
+        });
+
+        const xRight = rightEdge + extendAmount;
+        periodPosZ.forEach((z, i) => {
+            createEdgeLabel(chineseNumbers[i], xRight, yLabel, z, '16px');
+        });
+
+        function applyFilter() {
+            const selectedGroup = document.getElementById('groupFilter').value;
+            const selectedPeriod = document.getElementById('periodFilter').value;
+
+            allBars.forEach(bar => {
+                const data = bar.userData;
+                const isGroupMatch = selectedGroup === 'all' || data.g === parseInt(selectedGroup);
+                const isPeriodMatch = selectedPeriod === 'all' || data.r === parseInt(selectedPeriod);
+
+                if (isGroupMatch && isPeriodMatch) {
+                    bar.material.opacity = 1.0;
+                    bar.material.transparent = false;
+                } else {
+                    bar.material.opacity = 0.0;
+                    bar.material.transparent = true; 
+                }
+                bar.material.needsUpdate = true;
+            });
+
+            allLabels.forEach(label => {
+                const data = label.userData;
+                const isGroupMatch = selectedGroup === 'all' || data.g === parseInt(selectedGroup);
+                const isPeriodMatch = selectedPeriod === 'all' || data.r === parseInt(selectedPeriod);
+
+                if (isGroupMatch && isPeriodMatch) {
+                    label.element.style.opacity = '1';
+                } else {
+                    label.element.style.opacity = '0';
+                }
+            });
+        }
+
+        document.getElementById('groupFilter').addEventListener('change', applyFilter);
+        document.getElementById('periodFilter').addEventListener('change', applyFilter);
+        document.getElementById('resetFilterBtn').addEventListener('click', () => {
+            document.getElementById('groupFilter').value = 'all';
+            document.getElementById('periodFilter').value = 'all';
+            applyFilter();
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 【核心调整】响应式/自适应核心 ---
+        function onWindowResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(width, height);
+            labelRenderer.setSize(width, height);
+        }
+
+        // 监听窗口尺寸变化（包括键盘弹出、分屏等情况）
+        window.addEventListener('resize', onWindowResize);
+        // 监听设备物理旋转（横竖屏切换）
+        window.addEventListener('orientationchange', () => {
+            // 延迟执行以等待旋转动画完成
+            setTimeout(onWindowResize, 300);
+        });
+
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

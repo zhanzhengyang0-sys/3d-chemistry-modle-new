@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CaF₂ 萤石晶胞 · 点击F⁻显示/隐藏四面体</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        canvas { display: block; touch-action: none; }
+
+        /* 底部控制面板：提示文字 + 全局按钮 */
+        .control-bar {
+            position: absolute;
+            bottom: max(14px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(235, 235, 235, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 6px 8px 6px 16px;
+            border-radius: 40px;
+            border: 1px solid rgba(128, 128, 128, 0.3);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            z-index: 100;
+            max-width: calc(100vw - 20px);
+            box-sizing: border-box;
+        }
+        .info-text {
+            color: #555;
+            font-size: 12px;
+            font-weight: 450;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            font-family: 'Segoe UI', monospace;
+            user-select: none;
+            -webkit-user-select: none;
+            pointer-events: none;
+        }
+        .toggle-all-btn {
+            background: rgba(255, 100, 100, 0.85);
+            color: #fff;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Segoe UI', monospace;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            min-height: 32px;
+            min-width: 90px;
+            box-shadow: 0 1px 4px rgba(255, 100, 100, 0.3);
+        }
+        .toggle-all-btn:hover { filter: brightness(1.08); }
+        .toggle-all-btn:active { transform: scale(0.96); }
+
+        /* 右上角状态指示 */
+        .status-badge {
+            position: absolute;
+            top: max(12px, env(safe-area-inset-top));
+            right: max(12px, env(safe-area-inset-right));
+            background: rgba(0, 0, 0, 0.5);
+            color: #ffcc99;
+            padding: 3px 12px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-family: monospace;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 100;
+            pointer-events: none;
+            letter-spacing: 0.3px;
+            border: 1px solid rgba(255,255,255,0.2);
+            font-weight: 400;
+        }
+        @media (max-width: 768px) {
+            .control-bar { padding: 5px 6px 5px 12px; gap: 8px; bottom: max(10px, env(safe-area-inset-bottom)); }
+            .info-text { font-size: 10px; }
+            .toggle-all-btn { padding: 6px 10px; font-size: 11px; min-height: 28px; min-width: 78px; }
+            .status-badge { font-size: 9px; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); padding: 2px 10px; }
+        }
+    </style>
+
+    </head>
+<body>
+    <!-- ★★★ 底部控制栏：提示文字 + 全局按钮（上一版遗漏的 HTML） ★★★ -->
+    <div class="control-bar">
+        <span class="info-text">✨ 点击绿色 F⁻ 显示/隐藏红色四面体</span>
+        <button id="toggleAllTetraBtn" class="toggle-all-btn">🔘 全部显示</button>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+        scene.fog = new THREE.Fog(0xffffff, 7, 15);
+
+        // --- 相机 ---
+        const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(2.2, 1.6, 3.2);
+        camera.lookAt(0.5, 0.5, 0.5);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.3);
+        light1.position.set(3.0, 4.0, 3.0);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffffff, 0.7);
+        light2.position.set(-2.5, 1.0, -2.0);
+        scene.add(light2);
+
+        const light3 = new THREE.DirectionalLight(0xffffff, 0.5);
+        light3.position.set(-1.0, 1.5, -4.0);
+        scene.add(light3);
+
+        const pointLight1 = new THREE.PointLight(0xffffff, 0.6);
+        pointLight1.position.set(0.8, 0.8, 0.8);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xffffff, 0.5);
+        pointLight2.position.set(0.2, 0.2, 0.2);
+        scene.add(pointLight2);
+
+        const pointLight3 = new THREE.PointLight(0xffffff, 0.4);
+        pointLight3.position.set(1.2, 0.3, 1.2);
+        scene.add(pointLight3);
+
+        const topLight = new THREE.PointLight(0xffffff, 0.5);
+        topLight.position.set(0.5, 2.0, 0.5);
+        scene.add(topLight);
+
+        // --- 轨道控制 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.target.set(0.5, 0.5, 0.5);
+        controls.maxPolarAngle = Math.PI;
+        controls.minDistance = 1.2;
+        controls.maxDistance = 8.0;
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.enableZoom = true;
+        controls.zoomSpeed = 1.2;
+        controls.rotateSpeed = 1.0;
+
+        // --- 灰色棱边 ---
+        const edgeMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7, metalness: 0.0 });
+        const edgeRadius = 0.012;
+
+        function addEdge(x1, y1, z1, x2, y2, z2) {
+            const start = new THREE.Vector3(x1, y1, z1);
+            const end = new THREE.Vector3(x2, y2, z2);
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(edgeRadius, edgeRadius, length, 8), edgeMaterial);
+            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            cylinder.position.copy(midPoint);
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+            scene.add(cylinder);
+        }
+
+        const edgesPoints = [
+            [0,0,0,1,0,0], [1,0,0,1,0,1], [1,0,1,0,0,1], [0,0,1,0,0,0],
+            [0,1,0,1,1,0], [1,1,0,1,1,1], [1,1,1,0,1,1], [0,1,1,0,1,0],
+            [0,0,0,0,1,0], [1,0,0,1,1,0], [1,0,1,1,1,1], [0,0,1,0,1,1]
+        ];
+        edgesPoints.forEach(ep => addEdge(ep[0], ep[1], ep[2], ep[3], ep[4], ep[5]));
+
+        // --- 离子材质 ---
+        const greenMaterial = new THREE.MeshStandardMaterial({
+            color: 0x0a3d0a,
+            roughness: 0.25,
+            metalness: 0.1,
+            emissive: 0x000000
+        });
+        const blackMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            roughness: 0.35,
+            metalness: 0.0,
+            emissive: 0x000000
+        });
+
+        function addSphere(posX, posY, posZ, material, radius, userData = {}) {
+            const geometry = new THREE.SphereGeometry(radius, 64, 32);
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.set(posX, posY, posZ);
+            sphere.userData = userData;
+            scene.add(sphere);
+            return sphere;
+        }
+
+        // --- 钙离子位置 ---
+        const cornerPositions = [
+            [0,0,0], [1,0,0], [0,1,0], [0,0,1],
+            [1,1,0], [1,0,1], [0,1,1], [1,1,1]
+        ];
+        const faceCenters = [
+            [0.5,0.5,0], [0.5,0.5,1], [0.5,0,0.5], [0.5,1,0.5], [0,0.5,0.5], [1,0.5,0.5]
+        ];
+
+        const BLACK_RADIUS = 0.09;
+        const GREEN_RADIUS = 0.14;
+
+        cornerPositions.forEach(pos => addSphere(pos[0], pos[1], pos[2], blackMaterial, BLACK_RADIUS));
+        faceCenters.forEach(pos => addSphere(pos[0], pos[1], pos[2], blackMaterial, BLACK_RADIUS));
+
+        const allCalciumCoords = [...cornerPositions, ...faceCenters];
+
+        function distSq(p1, p2) {
+            const dx = p1[0] - p2[0];
+            const dy = p1[1] - p2[1];
+            const dz = p1[2] - p2[2];
+            return dx*dx + dy*dy + dz*dz;
+        }
+
+        function getNearestCalciumVertices(fx, fy, fz) {
+            const distances = allCalciumCoords.map(ca => ({
+                pos: ca,
+                distSq: distSq([fx, fy, fz], ca)
+            }));
+            distances.sort((a, b) => a.distSq - b.distSq);
+            return distances.slice(0, 4).map(d => d.pos);
+        }
+
+        function createTetrahedronMesh(verticesPos, color = 0xff4444, opacity = 0.48) {
+            const group = new THREE.Group();
+            const v = verticesPos.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+
+            const faces = [[0,1,2], [0,2,3], [0,3,1], [1,2,3]];
+            const faceMaterial = new THREE.MeshPhongMaterial({
+                color: color,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: opacity,
+                emissive: 0x331100,
+                shininess: 65
+            });
+
+            faces.forEach(faceIndices => {
+                const p0 = v[faceIndices[0]];
+                const p1 = v[faceIndices[1]];
+                const p2 = v[faceIndices[2]];
+                const positions = [p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z];
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+                geometry.computeVertexNormals();
+                const mesh = new THREE.Mesh(geometry, faceMaterial);
+                group.add(mesh);
+            });
+
+            const edgesPairs = [[0,1], [0,2], [0,3], [1,2], [2,3], [3,1]];
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0xcc6666 });
+            edgesPairs.forEach(pair => {
+                const points = [v[pair[0]], v[pair[1]]];
+                const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+                const lineObj = new THREE.Line(lineGeo, lineMaterial);
+                group.add(lineObj);
+            });
+
+            return group;
+        }
+
+        // --- 氟离子位置 ---
+        const fPositions = [
+            [0.25, 0.25, 0.25], [0.25, 0.75, 0.25], [0.75, 0.25, 0.25], [0.75, 0.75, 0.25],
+            [0.25, 0.25, 0.75], [0.25, 0.75, 0.75], [0.75, 0.25, 0.75], [0.75, 0.75, 0.75]
+        ];
+
+        const fluorideSpheres = [];
+        const tetrahedronGroups = new Map();
+
+        fPositions.forEach((pos, idx) => {
+            const sphere = addSphere(pos[0], pos[1], pos[2], greenMaterial, GREEN_RADIUS, { isFluoride: true, index: idx });
+            fluorideSpheres.push(sphere);
+
+            const nearestCa = getNearestCalciumVertices(pos[0], pos[1], pos[2]);
+            const tetraGroup = createTetrahedronMesh(nearestCa, 0xff5555, 0.48);
+            tetraGroup.visible = false;
+            scene.add(tetraGroup);
+
+            tetrahedronGroups.set(sphere, {
+                group: tetraGroup,
+                visible: false
+            });
+        });
+
+        // --- 射线检测 ---
+        const raycaster = new THREE.Raycaster();
+        const mouseVector = new THREE.Vector2();
+        let lastTapTime = 0;
+
+        // 右上角状态指示
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'status-badge';
+        statusDiv.innerHTML = '💡 点击绿色球';
+        document.body.appendChild(statusDiv);
+
+        // --- 全局控制按钮 ---
+        const toggleAllBtn = document.getElementById('toggleAllTetraBtn');
+
+        function countVisibleTetra() {
+            let n = 0;
+            tetrahedronGroups.forEach(data => { if (data.visible) n++; });
+            return n;
+        }
+
+        function updateGlobalButtonState() {
+            if (!toggleAllBtn) return;   // ★ 空值保护
+            const total = tetrahedronGroups.size;
+            const vis = countVisibleTetra();
+            if (vis === 0) {
+                toggleAllBtn.textContent = '🔘 全部显示';
+                toggleAllBtn.style.background = 'rgba(255, 100, 100, 0.85)';
+            } else if (vis === total) {
+                toggleAllBtn.textContent = '🔴 全部隐藏';
+                toggleAllBtn.style.background = 'rgba(80, 80, 90, 0.85)';
+            } else {
+                toggleAllBtn.textContent = `🔘 全部显示 (${vis}/${total})`;
+                toggleAllBtn.style.background = 'rgba(255, 140, 80, 0.85)';
+            }
+        }
+
+        function updateStatusBadge() {
+            const vis = countVisibleTetra();
+            if (vis === 0) {
+                statusDiv.innerHTML = '💡 点击绿色球';
+            } else {
+                statusDiv.innerHTML = `🔺 四面体可见 (${vis}/${tetrahedronGroups.size})`;
+            }
+        }
+
+        function showAllTetrahedrons() {
+            tetrahedronGroups.forEach(data => {
+                data.group.visible = true;
+                data.visible = true;
+            });
+            updateGlobalButtonState();
+            updateStatusBadge();
+        }
+
+        function hideAllTetrahedrons() {
+            tetrahedronGroups.forEach(data => {
+                data.group.visible = false;
+                data.visible = false;
+            });
+            updateGlobalButtonState();
+            updateStatusBadge();
+        }
+
+        function toggleAllTetrahedrons() {
+            const total = tetrahedronGroups.size;
+            if (countVisibleTetra() === total) {
+                hideAllTetrahedrons();
+            } else {
+                showAllTetrahedrons();
+            }
+        }
+
+        if (toggleAllBtn) {
+            toggleAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleAllTetrahedrons();
+            });
+        }
+
+        // 初始化按钮状态
+        updateGlobalButtonState();
+
+        // --- 单个点击切换 ---
+        function onPointerClick(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            let clientX, clientY;
+            if (event.touches) {
+                if (event.touches.length === 0) return;
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+                event.preventDefault();
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+
+            mouseVector.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouseVector.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouseVector, camera);
+            const intersects = raycaster.intersectObjects(fluorideSpheres);
+            if (intersects.length > 0) {
+                const hitSphere = intersects[0].object;
+                const tetraData = tetrahedronGroups.get(hitSphere);
+                if (tetraData) {
+                    const newVisible = !tetraData.visible;
+                    tetraData.group.visible = newVisible;
+                    tetraData.visible = newVisible;
+
+                    if (newVisible) {
+                        hitSphere.material.emissive = new THREE.Color(0x226622);
+                        hitSphere.material.emissiveIntensity = 0.35;
+                        setTimeout(() => {
+                            if (hitSphere.material) {
+                                hitSphere.material.emissive = new THREE.Color(0x000000);
+                                hitSphere.material.emissiveIntensity = 0;
+                            }
+                        }, 200);
+                    } else {
+                        hitSphere.material.emissive = new THREE.Color(0x000000);
+                        hitSphere.material.emissiveIntensity = 0;
+                    }
+
+                    updateGlobalButtonState();
+                    updateStatusBadge();
+                }
+            }
+        }
+
+        renderer.domElement.addEventListener('click', onPointerClick);
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const now = Date.now();
+            if (now - lastTapTime < 200) return;
+            lastTapTime = now;
+            if (e.touches.length === 1) {
+                const fakeEvent = {
+                    touches: e.touches,
+                    clientX: e.touches[0].clientX,
+                    clientY: e.touches[0].clientY,
+                    preventDefault: () => {}
+                };
+                onPointerClick(fakeEvent);
+            }
+        }, { passive: false });
+
+        // iOS Safari 页面级双指缩放拦截
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        // --- 动画循环 ---
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            time += 0.012;
+            pointLight1.intensity = 0.55 + Math.sin(time * 0.9) * 0.08;
+            topLight.intensity = 0.48 + Math.sin(time * 0.7) * 0.08;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // 窗口自适应
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        console.log('CaF₂ 萤石晶胞 | 底部控制栏新增「全部显示/隐藏四面体」按钮 | 单个点击与全局切换联动');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

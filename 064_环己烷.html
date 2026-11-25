@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>环己烷 · 椅型/船型</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #controls {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 24px;
+            background: rgba(245, 245, 245, 0.85);
+            padding: 4px 20px;
+            border-radius: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            backdrop-filter: blur(6px);
+            border: 1px solid #ddd;
+            z-index: 20;
+            font-size: 13px;
+            color: #333;
+        }
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .control-item input {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+            accent-color: #1a2a6c;
+            margin: 0;
+        }
+        .control-item label {
+            cursor: pointer;
+            font-weight: 450;
+            letter-spacing: 0.2px;
+            line-height: 1;
+        }
+    </style>
+    </head>
+<body>
+    <div id="controls">
+        <div class="control-item">
+            <input type="checkbox" id="toggleH">
+            <label for="toggleH">隐藏 H</label>
+        </div>
+        <div class="control-item">
+            <input type="checkbox" id="toggleConformer">
+            <label for="toggleConformer">椅型 / 船型</label>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5.0, 3.5, 7.0);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        // 光照
+        const ambientLight = new THREE.AmbientLight(0x505070, 0.6);
+        scene.add(ambientLight);
+        const light1 = new THREE.PointLight(0xffffff, 1.2);
+        light1.position.set(5, 9, 6);
+        scene.add(light1);
+        const light2 = new THREE.PointLight(0xccddff, 0.9);
+        light2.position.set(-5, 4, 7);
+        scene.add(light2);
+        const light3 = new THREE.DirectionalLight(0xffffff, 0.8);
+        light3.position.set(-2, 2, -7);
+        scene.add(light3);
+        const light4 = new THREE.PointLight(0xaaccff, 0.5);
+        light4.position.set(3, -4, 2);
+        scene.add(light4);
+        const light5 = new THREE.PointLight(0xffffff, 0.6);
+        light5.position.set(-4, 6, -5);
+        scene.add(light5);
+
+        const moleculeGroup = new THREE.Group();
+        scene.add(moleculeGroup);
+        const hydrogenGroup = new THREE.Group();
+        moleculeGroup.add(hydrogenGroup);
+
+        // 材质
+        const carbonMaterial = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.28, metalness: 0.05 });
+        const hydrogenMaterial = new THREE.MeshStandardMaterial({ color: 0x1a2a6c, roughness: 0.35, metalness: 0.05 });
+        const bondMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.05 });
+
+        // 参数
+        const bondLen = 1.54;
+        const targetAngle = 111.5 * Math.PI / 180;
+        const chBondLen = 1.09;
+        const tetrahedralAngle = 109.5 * Math.PI / 180;
+
+        // 生成椅型坐标
+        const deltaTheta = Math.PI / 3;
+        const diagLength = Math.sqrt(2 * bondLen * bondLen * (1 - Math.cos(targetAngle)));
+        const cosDt = Math.cos(deltaTheta);
+        const cos2Dt = Math.cos(2*deltaTheta);
+        const A = 2 - 2 * cosDt;
+        const B = 2 - 2 * cos2Dt;
+        const R = Math.sqrt(diagLength * diagLength / B);
+        const D = Math.sqrt((bondLen * bondLen - R * R * A) / 4);
+
+        function generateChairPositions() {
+            const pos = [];
+            for (let i = 0; i < 6; i++) {
+                const theta = i * deltaTheta;
+                const x = R * Math.cos(theta);
+                const z = R * Math.sin(theta);
+                const y = (i % 2 === 0) ? D : -D;
+                pos.push(new THREE.Vector3(x, y, z));
+            }
+            const rotAngle = 0.35;
+            const cosR = Math.cos(rotAngle);
+            const sinR = Math.sin(rotAngle);
+            return pos.map(p => new THREE.Vector3(
+                p.x * cosR - p.z * sinR,
+                p.y,
+                p.x * sinR + p.z * cosR
+            ));
+        }
+
+        function flipC6ToBoat(positions) {
+            const p1 = positions[0];
+            const p2 = positions[1];
+            const p4 = positions[3];
+            const p5 = positions[4];
+            
+            const v12 = new THREE.Vector3().subVectors(p2, p1);
+            const v14 = new THREE.Vector3().subVectors(p4, p1);
+            const normal = new THREE.Vector3().crossVectors(v12, v14).normalize();
+            
+            const p6_old = positions[5];
+            const d6_old = normal.dot(new THREE.Vector3().subVectors(p6_old, p1));
+            
+            const reflected = p6_old.clone().addScaledVector(normal, -2 * d6_old);
+            
+            const c1 = positions[0];
+            const c5 = positions[4];
+            
+            let bestT = 0;
+            let minError = Infinity;
+            for (let t = -0.2; t <= 0.2; t += 0.01) {
+                const candidate = reflected.clone().addScaledVector(normal, t);
+                const error = Math.abs(candidate.distanceTo(c1) - bondLen) + Math.abs(candidate.distanceTo(c5) - bondLen);
+                if (error < minError) {
+                    minError = error;
+                    bestT = t;
+                }
+            }
+            return reflected.clone().addScaledVector(normal, bestT);
+        }
+
+        let carbonPositions = generateChairPositions();
+        let isBoat = false;
+
+        function computeRawHydrogenDirs(cPos, neighbor1, neighbor2) {
+            const dir1 = new THREE.Vector3().subVectors(neighbor1, cPos).normalize();
+            const dir2 = new THREE.Vector3().subVectors(neighbor2, cPos).normalize();
+            
+            const a = dir1, b = dir2;
+            const cosPhi = Math.cos(tetrahedralAngle);
+            const cosTheta = a.dot(b);
+            
+            const det = 1 - cosTheta * cosTheta;
+            const alpha = (cosPhi * (1 - cosTheta)) / det;
+            const beta  = (cosPhi * (1 - cosTheta)) / det;
+            
+            const crossAB = new THREE.Vector3().crossVectors(a, b).normalize();
+            const gammaSq = 1 - (alpha*alpha + beta*beta + 2*alpha*beta*cosTheta);
+            const gamma = Math.sqrt(Math.max(0, gammaSq));
+            
+            const hDir1 = new THREE.Vector3().addScaledVector(a, alpha).addScaledVector(b, beta).addScaledVector(crossAB, gamma).normalize();
+            const hDir2 = new THREE.Vector3().addScaledVector(a, alpha).addScaledVector(b, beta).addScaledVector(crossAB, -gamma).normalize();
+            
+            return { dir1: hDir1, dir2: hDir2 };
+        }
+
+        function generateHydrogensChair(cPositions) {
+            hydrogenGroup.clear();
+            
+            cPositions.forEach((cPos, i) => {
+                const prev = cPositions[(i - 1 + 6) % 6];
+                const next = cPositions[(i + 1) % 6];
+                
+                const raw = computeRawHydrogenDirs(cPos, prev, next);
+                
+                const globalUp = new THREE.Vector3(0, 1, 0);
+                let axialDir, eqDir;
+                if (Math.abs(raw.dir1.dot(globalUp)) > Math.abs(raw.dir2.dot(globalUp))) {
+                    axialDir = raw.dir1; eqDir = raw.dir2;
+                } else {
+                    axialDir = raw.dir2; eqDir = raw.dir1;
+                }
+                
+                if (i % 2 === 0) {
+                    if (axialDir.dot(globalUp) < 0) axialDir.negate();
+                } else {
+                    if (axialDir.dot(globalUp) > 0) axialDir.negate();
+                }
+                eqDir = eqDir.sub(axialDir.clone().multiplyScalar(eqDir.dot(axialDir))).normalize();
+                
+                addHydrogenAtoms(cPos, axialDir, eqDir);
+            });
+        }
+
+        function generateHydrogensBoat(cPositions) {
+            hydrogenGroup.clear();
+            
+            cPositions.forEach((cPos, i) => {
+                const prev = cPositions[(i - 1 + 6) % 6];
+                const next = cPositions[(i + 1) % 6];
+                
+                const raw = computeRawHydrogenDirs(cPos, prev, next);
+                
+                const globalUp = new THREE.Vector3(0, 1, 0);
+                let axialDir, eqDir;
+                if (Math.abs(raw.dir1.dot(globalUp)) > Math.abs(raw.dir2.dot(globalUp))) {
+                    axialDir = raw.dir1; eqDir = raw.dir2;
+                } else {
+                    axialDir = raw.dir2; eqDir = raw.dir1;
+                }
+                
+                if (i === 5) {
+                    if (axialDir.dot(globalUp) < 0) axialDir.negate();
+                } else if (i === 0 || i === 4) {
+                    // C1和C5：不做任何翻转
+                } else if (i === 1 || i === 3) {
+                    if (axialDir.dot(globalUp) > 0) axialDir.negate();
+                } else if (i === 2) {
+                    if (axialDir.dot(globalUp) < 0) axialDir.negate();
+                }
+                
+                eqDir = eqDir.sub(axialDir.clone().multiplyScalar(eqDir.dot(axialDir))).normalize();
+                addHydrogenAtoms(cPos, axialDir, eqDir);
+            });
+        }
+
+        function addHydrogenAtoms(cPos, axialDir, eqDir) {
+            const hAxial = cPos.clone().add(axialDir.clone().multiplyScalar(chBondLen));
+            const hEq = cPos.clone().add(eqDir.clone().multiplyScalar(chBondLen));
+            
+            addBondLocal(cPos, hAxial, 0.048, bondMaterial);
+            addBondLocal(cPos, hEq, 0.048, bondMaterial);
+            
+            const h1 = new THREE.Mesh(new THREE.SphereGeometry(0.21, 28, 16), hydrogenMaterial.clone());
+            h1.position.copy(hAxial);
+            hydrogenGroup.add(h1);
+            const h2 = new THREE.Mesh(new THREE.SphereGeometry(0.21, 28, 16), hydrogenMaterial.clone());
+            h2.position.copy(hEq);
+            hydrogenGroup.add(h2);
+        }
+
+        function addBondLocal(p1, p2, r, mat) {
+            const dir = new THREE.Vector3().subVectors(p2, p1);
+            const len = dir.length();
+            const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), mat.clone());
+            const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+            cyl.position.copy(mid);
+            cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+            hydrogenGroup.add(cyl);
+        }
+
+        function rebuildMolecule() {
+            while(moleculeGroup.children.length > 0) {
+                moleculeGroup.remove(moleculeGroup.children[0]);
+            }
+            hydrogenGroup.clear();
+            moleculeGroup.add(hydrogenGroup);
+            
+            // 碳原子（无标签）
+            carbonPositions.forEach((pos) => {
+                const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.34, 38, 20), carbonMaterial.clone());
+                sphere.position.copy(pos);
+                moleculeGroup.add(sphere);
+            });
+            
+            // 碳-碳键
+            function addBond(p1, p2, r, mat, parent) {
+                const dir = new THREE.Vector3().subVectors(p2, p1);
+                const len = dir.length();
+                const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), mat.clone());
+                const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+                cyl.position.copy(mid);
+                cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+                parent.add(cyl);
+            }
+            
+            for (let i = 0; i < 6; i++) {
+                const j = (i + 1) % 6;
+                addBond(carbonPositions[i], carbonPositions[j], 0.072, bondMaterial, moleculeGroup);
+            }
+            
+            if (isBoat) {
+                generateHydrogensBoat(carbonPositions);
+            } else {
+                generateHydrogensChair(carbonPositions);
+            }
+        }
+
+        function updateConformer() {
+            if (isBoat) {
+                const chairPos = generateChairPositions();
+                const newC6 = flipC6ToBoat(chairPos);
+                carbonPositions = chairPos;
+                carbonPositions[5] = newC6;
+            } else {
+                carbonPositions = generateChairPositions();
+            }
+            rebuildMolecule();
+        }
+
+        hydrogenGroup.visible = true;
+        updateConformer();
+
+        document.getElementById('toggleH').addEventListener('change', (e) => {
+            hydrogenGroup.visible = !e.target.checked;
+        });
+        
+        document.getElementById('toggleConformer').addEventListener('change', (e) => {
+            isBoat = e.target.checked;
+            updateConformer();
+            hydrogenGroup.visible = !document.getElementById('toggleH').checked;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

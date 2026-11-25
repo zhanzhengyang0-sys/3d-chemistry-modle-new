@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+    <title>FCC 四层堆积 · 触屏控制</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: white;
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        canvas { display: block; touch-action: none; }
+
+        /* ============================================================
+           控制面板：flex-wrap 自动换行，窄屏完整可见
+           ============================================================ */
+        #control-panel {
+            position: absolute;
+            bottom: max(16px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 8px 14px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(200, 200, 200, 0.3);
+            display: flex;
+            flex-wrap: wrap;              /* ★ 关键：允许换行 */
+            gap: 8px 14px;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            pointer-events: auto;
+            color: #2c3e50;
+            line-height: 1;
+            font-size: 13px;
+        }
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 0 0 auto;
+            min-height: 32px;
+        }
+        .control-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #1e3c72;
+            opacity: 0.85;
+            white-space: nowrap;
+        }
+
+        /* 堆积按钮 */
+        .stack-btn {
+            width: 30px;
+            height: 30px;
+            min-width: 30px;
+            min-height: 30px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: #3a86ff;
+            color: white;
+            font-size: 18px;
+            font-weight: 300;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(58, 134, 255, 0.2);
+            transition: all 0.15s;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            padding: 0;
+        }
+        .stack-btn:active {
+            background: #1e6f9f;
+            transform: scale(0.92);
+        }
+        .stack-btn.disabled {
+            opacity: 0.35;
+            pointer-events: none;
+            background: #a0b8d4;
+        }
+        .stack-count {
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 20px;
+            text-align: center;
+            color: #1e3c72;
+        }
+
+        /* 颜色选择器 */
+        .color-picker {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .color-option {
+            width: 26px;
+            height: 26px;
+            min-width: 26px;
+            min-height: 26px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            transition: transform 0.1s, box-shadow 0.2s;
+            border: 2px solid transparent;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .color-option.active {
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px #3a86ff, 0 1px 6px rgba(0,0,0,0.15);
+            transform: scale(1.05);
+        }
+        .reset-btn {
+            background: rgba(220, 230, 240, 0.75);
+            border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #2c3e50;
+            cursor: pointer;
+            transition: background 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 28px;
+        }
+        .reset-btn:active {
+            background: rgba(200, 215, 230, 0.9);
+        }
+
+        /* 滑块 */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+        }
+        .slider-container input {
+            width: 110px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #cbd6e3;
+            border-radius: 10px;
+            outline: none;
+            touch-action: none;      /* 让滑块独占触摸 */
+            cursor: pointer;
+        }
+        .slider-container input:disabled {
+            opacity: 0.4;
+            background: #d0d8e3;
+            cursor: not-allowed;
+        }
+        .slider-container input:disabled::-webkit-slider-thumb {
+            background: #a0b8d4;
+        }
+        .slider-container input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #3a86ff;
+            border-radius: 50%;
+            box-shadow: 0 1px 4px rgba(58,134,255,0.3);
+            border: 2px solid white;
+            cursor: grab;
+            transition: transform 0.1s;
+        }
+        .slider-container input::-webkit-slider-thumb:active {
+            transform: scale(1.15);
+        }
+        .slider-container input::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #3a86ff;
+            border-radius: 50%;
+            border: 2px solid white;
+            cursor: grab;
+        }
+        .slider-value {
+            min-width: 38px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1e3c72;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ============================================================
+           触屏设备（粗指针）: 加大所有可点击目标和滑块
+           ============================================================ */
+        @media (pointer: coarse) {
+            .stack-btn {
+                width: 36px;
+                height: 36px;
+                min-width: 36px;
+                min-height: 36px;
+                font-size: 20px;
+            }
+            .color-option {
+                width: 32px;
+                height: 32px;
+                min-width: 32px;
+                min-height: 32px;
+            }
+            .reset-btn {
+                min-height: 34px;
+                padding: 7px 14px;
+                font-size: 13px;
+            }
+            .slider-container input {
+                height: 8px;
+                width: 130px;
+            }
+            .slider-container input::-webkit-slider-thumb {
+                width: 24px;
+                height: 24px;
+            }
+            .slider-container input::-moz-range-thumb {
+                width: 24px;
+                height: 24px;
+            }
+            .slider-container {
+                padding: 8px 0;
+            }
+            .control-item {
+                min-height: 38px;
+            }
+        }
+
+        /* ============================================================
+           窄屏: 控制面板铺满宽度、自动换行、压缩间距
+           ============================================================ */
+        @media (max-width: 700px) {
+            #control-panel {
+                width: calc(100vw - 16px);
+                padding: 8px 10px;
+                gap: 6px 10px;
+                border-radius: 16px;
+            }
+            .control-label {
+                font-size: 11px;
+            }
+            .slider-container input {
+                width: 90px;
+            }
+            .slider-value {
+                font-size: 12px;
+                min-width: 32px;
+            }
+            .control-item {
+                min-height: 30px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            #control-panel {
+                padding: 6px 8px;
+                gap: 5px 8px;
+            }
+            .control-label {
+                font-size: 10px;
+            }
+            .slider-container input {
+                width: 70px;
+            }
+            .stack-btn {
+                width: 28px;
+                height: 28px;
+                min-width: 28px;
+                min-height: 28px;
+                font-size: 16px;
+            }
+            .color-option {
+                width: 24px;
+                height: 24px;
+                min-width: 24px;
+                min-height: 24px;
+            }
+            .reset-btn {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 底部控制面板 -->
+    <div id="control-panel">
+        <div class="control-item">
+            <span class="control-label">堆积</span>
+            <button id="stack-minus" class="stack-btn" aria-label="减少一层">−</button>
+            <span id="stack-count" class="stack-count">4</span>
+            <button id="stack-plus" class="stack-btn" aria-label="增加一层">+</button>
+        </div>
+
+        <div class="control-item">
+            <span class="control-label">选色</span>
+            <div class="color-picker">
+                <div id="color-blue" class="color-option active" style="background: #3a86ff;" data-color="#3a86ff" data-name="蓝色"></div>
+                <div id="color-green" class="color-option" style="background: #2ecc71;" data-color="#2ecc71" data-name="绿色"></div>
+                <div id="color-red" class="color-option" style="background: #e74c3c;" data-color="#e74c3c" data-name="红色"></div>
+            </div>
+            <button id="reset-colors" class="reset-btn">↻ 恢复</button>
+        </div>
+
+        <div class="control-item">
+            <span class="control-label">层间距</span>
+            <div class="slider-container">
+                <input type="range" id="layer-spacing-slider" min="0.73" max="1.4" step="0.01" value="0.73">
+                <span id="spacing-value" class="slider-value">0.73</span>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <span class="control-label">球间距</span>
+            <div class="slider-container">
+                <input type="range" id="ball-spacing-slider" min="0.9" max="1.8" step="0.01" value="0.9" disabled>
+                <span id="ball-spacing-value" class="slider-value">0.90</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const container = document.getElementById('canvas-container');
+
+        // --- 相机 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(7, 4.5, 9);
+        camera.lookAt(0, 1.2, 0);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        container.appendChild(renderer.domElement);
+
+        // --- 全局变量 ---
+        const baseRadius = 0.45;
+        const baseBallSpacing = 0.9;
+        const baseLayerSpacing = 0.73;
+
+        const layers = {
+            A1: { atoms: [], y: 0, type: 'A', color: '#3a86ff' },
+            B:  { atoms: [], y: 0, type: 'B', color: '#3a86ff' },
+            C:  { atoms: [], y: 0, type: 'C', color: '#3a86ff' },
+            A2: { atoms: [], y: 0, type: 'A', color: '#3a86ff' }
+        };
+
+        let connectionRods = [];
+        const ballPositions = new Map();
+
+        let currentLayerCount = 4;
+        let selectedColor = '#3a86ff';
+        let currentLayerSpacing = baseLayerSpacing;
+        let currentBallSpacing = baseBallSpacing;
+        let isLayerSpacingLocked = true;
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function getTargetY() {
+            const yB = currentLayerSpacing;
+            const yC = currentLayerSpacing * 2;
+            return (yB + yC) / 2;
+        }
+
+        // --- 控制器（显式声明触摸手势） ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.set(0, getTargetY(), 0);
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        controls.update();
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight1.position.set(2, 5, 3);
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0xccddff, 0.6);
+        dirLight2.position.set(-4, 3, -2);
+        scene.add(dirLight2);
+
+        const fillLight = new THREE.PointLight(0xaaccff, 0.4);
+        fillLight.position.set(1, 2, 5);
+        scene.add(fillLight);
+
+        // --- 连接棒 ---
+        function createRod(start, end, color = 0x666666, radius = 0.05) {
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            const geometry = new THREE.CylinderGeometry(radius, radius, length, 6);
+            const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+            const cylinder = new THREE.Mesh(geometry, material);
+            const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            cylinder.position.copy(mid);
+            cylinder.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                direction.clone().normalize()
+            );
+            return cylinder;
+        }
+
+        function updateConnectionRods() {
+            connectionRods.forEach(rod => scene.remove(rod));
+            connectionRods = [];
+
+            if (currentBallSpacing <= 0.905) return;
+
+            const connections = [
+                [14, 11], [14, 9], [14, 13],
+                [11, 4], [11, 6],
+                [13, 2], [13, 6],
+                [9, 4], [9, 2],
+                [1, 2], [1, 4], [1, 6]
+            ];
+
+            connections.forEach(([num1, num2]) => {
+                const pos1 = ballPositions.get(num1);
+                const pos2 = ballPositions.get(num2);
+                if (pos1 && pos2) {
+                    const rod = createRod(pos1, pos2, 0x666666, 0.05);
+                    scene.add(rod);
+                    connectionRods.push(rod);
+                }
+            });
+        }
+
+        // --- 三角形布局 ---
+        function getTriangleWithSpacing(spacing) {
+            const positions = [];
+            for (let q = 0; q <= 2; q++) {
+                for (let r = 0; r <= 2 - q; r++) {
+                    const x = spacing * (q + r / 2);
+                    const z = spacing * (Math.sqrt(3) / 2 * r);
+                    positions.push({ x, z });
+                }
+            }
+            const centerX = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+            const centerZ = positions.reduce((s, p) => s + p.z, 0) / positions.length;
+            let centered = positions.map(p => ({ x: p.x - centerX, z: p.z - centerZ }));
+
+            const rot = -Math.PI / 6;
+            const cos = Math.cos(rot), sin = Math.sin(rot);
+            return centered.map(p => ({ x: p.x * cos - p.z * sin, z: p.x * sin + p.z * cos }));
+        }
+
+        // --- 重建所有层 ---
+        function rebuildLayers() {
+            Object.values(layers).forEach(layer => {
+                layer.atoms.forEach(obj => scene.remove(obj));
+            });
+            ballPositions.clear();
+
+            const yPositions = [];
+            for (let i = 0; i < currentLayerCount; i++) {
+                yPositions.push(i * currentLayerSpacing);
+            }
+
+            controls.target.set(0, getTargetY(), 0);
+
+            const layerKeys = ['A1', 'B', 'C', 'A2'];
+            const triangleB = getTriangleWithSpacing(currentBallSpacing);
+            const triangleC = triangleB.map(p => ({ x: -p.x, z: -p.z }));
+
+            const sortedB = [...triangleB].sort((a, b) => Math.atan2(a.z, a.x) - Math.atan2(b.z, b.x));
+            const sortedC = [...triangleC].sort((a, b) => Math.atan2(a.z, a.x) - Math.atan2(b.z, b.x));
+
+            for (let i = 0; i < currentLayerCount; i++) {
+                const key = layerKeys[i];
+                const y = yPositions[i];
+                layers[key].y = y;
+                layers[key].atoms = [];
+
+                if (key === 'A1') {
+                    const sphere = new THREE.Mesh(
+                        new THREE.SphereGeometry(baseRadius, 48, 24),
+                        new THREE.MeshStandardMaterial({ color: layers[key].color, roughness: 0.2, metalness: 0.05, emissive: new THREE.Color(0x112233) })
+                    );
+                    sphere.position.set(0, y, 0);
+                    sphere.userData.layerKey = key;
+                    sphere.userData.ballNumber = 1;
+                    scene.add(sphere);
+                    layers[key].atoms.push(sphere);
+                    ballPositions.set(1, new THREE.Vector3(0, y, 0));
+
+                } else if (key === 'B') {
+                    sortedB.forEach((pos, idx) => {
+                        const sphere = new THREE.Mesh(
+                            new THREE.SphereGeometry(baseRadius, 48, 24),
+                            new THREE.MeshStandardMaterial({ color: layers[key].color, roughness: 0.2, metalness: 0.05 })
+                        );
+                        sphere.position.set(pos.x, y, pos.z);
+                        sphere.userData.layerKey = key;
+                        sphere.userData.ballNumber = idx + 2;
+                        scene.add(sphere);
+                        layers[key].atoms.push(sphere);
+                        ballPositions.set(idx + 2, new THREE.Vector3(pos.x, y, pos.z));
+                    });
+
+                } else if (key === 'C') {
+                    sortedC.forEach((pos, idx) => {
+                        const sphere = new THREE.Mesh(
+                            new THREE.SphereGeometry(baseRadius, 48, 24),
+                            new THREE.MeshStandardMaterial({ color: layers[key].color, roughness: 0.2, metalness: 0.05 })
+                        );
+                        sphere.position.set(pos.x, y, pos.z);
+                        sphere.userData.layerKey = key;
+                        sphere.userData.ballNumber = idx + 8;
+                        scene.add(sphere);
+                        layers[key].atoms.push(sphere);
+                        ballPositions.set(idx + 8, new THREE.Vector3(pos.x, y, pos.z));
+                    });
+
+                } else if (key === 'A2') {
+                    const sphere = new THREE.Mesh(
+                        new THREE.SphereGeometry(baseRadius, 48, 24),
+                        new THREE.MeshStandardMaterial({ color: layers[key].color, roughness: 0.2, metalness: 0.05, emissive: new THREE.Color(0x112233) })
+                    );
+                    sphere.position.set(0, y, 0);
+                    sphere.userData.layerKey = key;
+                    sphere.userData.ballNumber = 14;
+                    scene.add(sphere);
+                    layers[key].atoms.push(sphere);
+                    ballPositions.set(14, new THREE.Vector3(0, y, 0));
+                }
+            }
+
+            updateConnectionRods();
+
+            document.getElementById('stack-count').textContent = currentLayerCount;
+            document.getElementById('stack-minus').classList.toggle('disabled', currentLayerCount <= 1);
+            document.getElementById('stack-plus').classList.toggle('disabled', currentLayerCount >= 4);
+        }
+
+        // ============================================================
+        // 拾取：射线优先，触屏 45px 屏幕空间 fallback
+        // ============================================================
+        function doPick(clientX, clientY, pointerType) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const allSpheres = Object.values(layers).flatMap(l => l.atoms);
+            const intersects = raycaster.intersectObjects(allSpheres);
+
+            let hit = null;
+            if (intersects.length > 0) {
+                hit = intersects[0].object;
+            } else if (pointerType !== 'mouse') {
+                // 触屏 fallback：屏幕空间 45px 内最近的球
+                const v = new THREE.Vector3();
+                let best = null, bestDist = 45;
+                allSpheres.forEach(sphere => {
+                    sphere.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = sphere; }
+                });
+                if (best) hit = best;
+            }
+
+            if (!hit) return;
+            const layerKey = hit.userData.layerKey;
+            if (layerKey && layers[layerKey]) {
+                layers[layerKey].atoms.forEach(sphere => {
+                    sphere.material.color.set(selectedColor);
+                });
+                layers[layerKey].color = selectedColor;
+            }
+        }
+
+        // ============================================================
+        // 触屏 / 鼠标 点击识别（三段式，避免拖拽误触发）
+        // ============================================================
+        const activePointers = new Set();
+        let pointerDownInfo = null;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                pointerDownInfo = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch',
+                    id: e.pointerId
+                };
+            } else {
+                pointerDownInfo = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!pointerDownInfo || pointerDownInfo.id !== e.pointerId || activePointers.size !== 1) return;
+            const dx = e.clientX - pointerDownInfo.x;
+            const dy = e.clientY - pointerDownInfo.y;
+            const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+            if (dx * dx + dy * dy > thr * thr) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const countBeforeUp = activePointers.size;
+            if (pointerDownInfo && pointerDownInfo.id === e.pointerId && countBeforeUp === 1) {
+                const dx = e.clientX - pointerDownInfo.x;
+                const dy = e.clientY - pointerDownInfo.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = performance.now() - pointerDownInfo.t;
+                const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+                if (dist <= thr && dt <= 500) {
+                    doPick(e.clientX, e.clientY, pointerDownInfo.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            pointerDownInfo = null;
+        });
+
+        // iOS Safari 页面级双指缩放拦截
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        // 控制面板阻止事件冒泡到 canvas
+        const controlPanel = document.getElementById('control-panel');
+        controlPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+        controlPanel.addEventListener('pointermove', (e) => e.stopPropagation());
+
+        // --- 颜色选择 ---
+        const colorOptions = document.querySelectorAll('.color-option');
+        colorOptions.forEach(opt => {
+            opt.addEventListener('click', () => {
+                selectedColor = opt.dataset.color;
+                colorOptions.forEach(o => o.classList.remove('active'));
+                opt.classList.add('active');
+            });
+        });
+
+        // 恢复颜色
+        document.getElementById('reset-colors').addEventListener('click', () => {
+            Object.keys(layers).forEach(k => {
+                layers[k].color = '#3a86ff';
+                layers[k].atoms.forEach(sphere => sphere.material.color.set('#3a86ff'));
+            });
+            selectedColor = '#3a86ff';
+            colorOptions.forEach(o => o.classList.remove('active'));
+            document.getElementById('color-blue').classList.add('active');
+        });
+
+        // 堆积控制
+        document.getElementById('stack-plus').addEventListener('click', () => {
+            if (currentLayerCount < 4) {
+                currentLayerCount++;
+                rebuildLayers();
+            }
+        });
+        document.getElementById('stack-minus').addEventListener('click', () => {
+            if (currentLayerCount > 1) {
+                currentLayerCount--;
+                rebuildLayers();
+            }
+        });
+
+        // --- 层间距滑块 ---
+        const layerSlider = document.getElementById('layer-spacing-slider');
+        const layerSpacingVal = document.getElementById('spacing-value');
+        const ballSlider = document.getElementById('ball-spacing-slider');
+        const ballSpacingVal = document.getElementById('ball-spacing-value');
+
+        layerSlider.addEventListener('input', (e) => {
+            currentLayerSpacing = parseFloat(e.target.value);
+            layerSpacingVal.textContent = currentLayerSpacing.toFixed(2);
+
+            const isExact = Math.abs(currentLayerSpacing - baseLayerSpacing) < 0.005;
+            ballSlider.disabled = !isExact;
+            isLayerSpacingLocked = isExact;
+
+            if (!isExact) {
+                currentBallSpacing = baseBallSpacing;
+                ballSpacingVal.textContent = currentBallSpacing.toFixed(2);
+                ballSlider.value = baseBallSpacing;
+            }
+
+            rebuildLayers();
+        });
+
+        // --- 球间距滑块 ---
+        ballSlider.addEventListener('input', (e) => {
+            currentBallSpacing = parseFloat(e.target.value);
+            ballSpacingVal.textContent = currentBallSpacing.toFixed(2);
+
+            const scale = currentBallSpacing / baseBallSpacing;
+            currentLayerSpacing = baseLayerSpacing * scale;
+            layerSpacingVal.textContent = currentLayerSpacing.toFixed(2);
+            layerSlider.value = currentLayerSpacing;
+
+            rebuildLayers();
+        });
+
+        // 初始化
+        rebuildLayers();
+        layerSpacingVal.textContent = currentLayerSpacing.toFixed(2);
+        ballSpacingVal.textContent = currentBallSpacing.toFixed(2);
+        ballSlider.disabled = false;
+
+        // ============================================================
+        // 相机自适应（横竖屏 / 窄屏）
+        // ============================================================
+        function updateCameraZoom() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const dist = camera.position.distanceTo(controls.target);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+            const baseVisibleH = 2 * dist * Math.tan(fovRad);
+            const baseVisibleW = baseVisibleH * aspect;
+
+            // 内容约 5.5 × 5（三角底边 + 4 层高度 + 斜视角投影 + 边距）
+            const contentW = 5.5;
+            const contentH = 5.0;
+
+            const zoomForW = baseVisibleW / contentW;
+            const zoomForH = baseVisibleH / contentH;
+
+            const isLandscape = aspect > 1;
+            const maxZoom = isLandscape ? 1.0 : 0.95;
+            const minZoom = isLandscape ? 0.5 : 0.28;
+
+            camera.zoom = Math.max(minZoom, Math.min(maxZoom, zoomForW, zoomForH));
+            camera.updateProjectionMatrix();
+        }
+        updateCameraZoom();
+
+        // --- 动画 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 窗口 / 屏幕变化 ---
+        let resizeTimer = null;
+        function onWindowResize() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                updateCameraZoom();
+            }, 60);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onWindowResize, 300);
+        });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onWindowResize);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

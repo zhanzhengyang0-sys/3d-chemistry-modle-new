@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>苯甲醛 · 碳氧键长4/5 · 双键清晰 · 共面</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #ffffff; font-family: 'Segoe UI', 'Arial', sans-serif; }
+    </style>
+    </head>
+<body>
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff); 
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(8.2, 3.8, 11.0);
+        camera.lookAt(0.9, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 光照 ---
+        const ambientLight = new THREE.AmbientLight(0x909090); 
+        scene.add(ambientLight);
+        
+        const light1 = new THREE.PointLight(0xffffff, 1.4);
+        light1.position.set(6, 7, 7);
+        scene.add(light1);
+        const light2 = new THREE.PointLight(0xffffff, 1.2);
+        light2.position.set(-6, 5, -6);
+        scene.add(light2);
+        const light3 = new THREE.PointLight(0xffffff, 1.0);
+        light3.position.set(0, -5, 8);
+        scene.add(light3);
+        const light4 = new THREE.PointLight(0xffffff, 0.8);
+        light4.position.set(0, 4, -8);
+        scene.add(light4);
+        const light5 = new THREE.PointLight(0xffffff, 1.1);
+        light5.position.set(4, 6, -5);
+        scene.add(light5);
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        fillLight.position.set(-2, 3, 4);
+        scene.add(fillLight);
+
+        // --- 轨道控制器 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.target.set(0.9, 0, 0);
+        controls.maxPolarAngle = Math.PI; 
+        controls.minPolarAngle = 0; 
+
+        // --- 原子参数 ---
+        const scaleFactor = 1.42;
+        const rC = 0.5;          // 碳半径
+        const rH = 0.3;          // 氢半径
+        const rO = 0.44;         // 氧半径略小于碳
+        
+        const colorC = 0x000000;      // 纯黑碳
+        const colorH = 0x003366;       // 深蓝色
+        const colorO = 0xff5500;       // 橙红氧
+        
+        const materialC = new THREE.MeshStandardMaterial({ color: colorC, roughness: 0.2, metalness: 0.05 });
+        const materialH = new THREE.MeshStandardMaterial({ color: colorH, roughness: 0.2, metalness: 0.0 });
+        const materialO = new THREE.MeshStandardMaterial({ color: colorO, roughness: 0.25, metalness: 0.0 });
+        
+        // 化学键材质 (黑灰色)
+        const bondMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.45 });
+        const bondThickness = 0.12;      // 单键粗细
+        
+        // 双键参数：细且间距大，清晰可辨
+        const doubleBondThickness = 0.08;  
+        const bondOffset = 0.20;            // 间距
+
+        // ========== 苯环部分 ==========
+        const hexRadius = 1.4 * scaleFactor;
+        const angles = [0, 60, 120, 180, 240, 300].map(deg => deg * Math.PI / 180);
+        const benzeneC = angles.map(angle => ({
+            x: hexRadius * Math.cos(angle),
+            y: 0,
+            z: hexRadius * Math.sin(angle)
+        }));
+
+        // 苯环氢 (5个)
+        const chLength = 1.1 * scaleFactor;
+        const hBenzenePositions = [];
+        for (let i = 1; i < 6; i++) {
+            const angle = angles[i];
+            const cx = benzeneC[i].x;
+            const cz = benzeneC[i].z;
+            const dirX = Math.cos(angle);
+            const dirZ = Math.sin(angle);
+            hBenzenePositions.push({
+                x: cx + dirX * chLength,
+                y: 0,
+                z: cz + dirZ * chLength
+            });
+        }
+
+        const fixedGroup = new THREE.Group();
+        
+        // 苯环碳
+        benzeneC.forEach(pos => {
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 32), materialC);
+            sphere.position.set(pos.x, pos.y, pos.z);
+            fixedGroup.add(sphere);
+        });
+        
+        // 苯环氢 (深蓝)
+        hBenzenePositions.forEach(pos => {
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 24), materialH);
+            sphere.position.set(pos.x, pos.y, pos.z);
+            fixedGroup.add(sphere);
+        });
+
+        // 苯环C-C键
+        for (let i = 0; i < 6; i++) {
+            const p1 = benzeneC[i];
+            const p2 = benzeneC[(i + 1) % 6];
+            const start = new THREE.Vector3(p1.x, p1.y, p1.z);
+            const end = new THREE.Vector3(p2.x, p2.y, p2.z);
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const length = dir.length();
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(bondThickness, bondThickness, length, 12),
+                bondMat
+            );
+            cylinder.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+            fixedGroup.add(cylinder);
+        }
+        
+        // 苯环C-H键
+        for (let i = 0; i < hBenzenePositions.length; i++) {
+            const carbonIndex = i + 1;
+            const pC = benzeneC[carbonIndex];
+            const pH = hBenzenePositions[i];
+            const start = new THREE.Vector3(pC.x, pC.y, pC.z);
+            const end = new THREE.Vector3(pH.x, pH.y, pH.z);
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const length = dir.length();
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(bondThickness, bondThickness, length, 12),
+                bondMat
+            );
+            cylinder.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+            fixedGroup.add(cylinder);
+        }
+
+        scene.add(fixedGroup);
+
+        // ========== 醛基 (与苯环共面，120°键角) ==========
+        const aldehydeGroup = new THREE.Group();
+        
+        const c0Pos = new THREE.Vector3(benzeneC[0].x, benzeneC[0].y, benzeneC[0].z);
+        const bondLengthC0C7 = 1.5 * scaleFactor;
+        
+        // C7 相对位置 (沿 X 轴，在苯环平面内，y=0)
+        const c7RelPos = new THREE.Vector3(bondLengthC0C7, 0, 0);
+        
+        // 醛基碳 (C7) - 纯黑
+        const c7Sphere = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 32), materialC);
+        c7Sphere.position.copy(c7RelPos);
+        aldehydeGroup.add(c7Sphere);
+        
+        // 醛基sp²杂化，三个键角均为120°
+        // C0-C7键沿着X轴负方向（从C7指向C0）
+        // 另外两个键（C=O和C-H）在XZ平面内，与C0-C7键各成120°
+        const bondLengthC7H = 1.09 * scaleFactor;
+        const bondLengthC7O = (1.22 * scaleFactor) * 0.8;  // 缩短为原来的4/5
+        
+        // C0-C7方向是从C7指向C0，即-X方向（180°）
+        // 氧的方向：与C0-C7键成120°夹角，即60°方向（第一象限）
+        // 氢的方向：与C0-C7键成120°夹角，即300°方向（第四象限）
+        const angleO = 60 * Math.PI / 180;    // 60°
+        const angleH = -60 * Math.PI / 180;   // -60°（即300°）
+        
+        const dirO = new THREE.Vector3(Math.cos(angleO), 0, Math.sin(angleO)).normalize();
+        const dirH = new THREE.Vector3(Math.cos(angleH), 0, Math.sin(angleH)).normalize();
+        
+        // 验证键角（可选）
+        const dirC0 = new THREE.Vector3(-1, 0, 0); // 从C7指向C0
+        console.log('C0-C7与C=O夹角:', dirC0.angleTo(dirO) * 180 / Math.PI); // 应为120°
+        console.log('C0-C7与C-H夹角:', dirC0.angleTo(dirH) * 180 / Math.PI); // 应为120°
+        console.log('C=O与C-H夹角:', dirO.angleTo(dirH) * 180 / Math.PI);    // 应为120°
+        
+        // 醛基氧 (橙红)
+        const oRelPos = c7RelPos.clone().add(dirO.clone().multiplyScalar(bondLengthC7O));
+        const oSphere = new THREE.Mesh(new THREE.SphereGeometry(rO, 64, 32), materialO);
+        oSphere.position.copy(oRelPos);
+        aldehydeGroup.add(oSphere);
+        
+        // 醛基氢 (深蓝)
+        const hRelPos = c7RelPos.clone().add(dirH.clone().multiplyScalar(bondLengthC7H));
+        const hSphere = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 24), materialH);
+        hSphere.position.copy(hRelPos);
+        aldehydeGroup.add(hSphere);
+        
+        // --- 键 ---
+        // C0-C7 单键
+        const bondC0C7 = new THREE.Mesh(
+            new THREE.CylinderGeometry(bondThickness, bondThickness, bondLengthC0C7, 12),
+            bondMat
+        );
+        bondC0C7.position.copy(c7RelPos.clone().multiplyScalar(0.5));
+        bondC0C7.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(1,0,0));
+        aldehydeGroup.add(bondC0C7);
+        
+        // C7-H 单键
+        const bondC7H = new THREE.Mesh(
+            new THREE.CylinderGeometry(bondThickness, bondThickness, bondLengthC7H, 12),
+            bondMat
+        );
+        bondC7H.position.copy(new THREE.Vector3().addVectors(c7RelPos, hRelPos).multiplyScalar(0.5));
+        bondC7H.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dirH.clone().normalize());
+        aldehydeGroup.add(bondC7H);
+        
+        // C7=O 双键: 垂直于键轴的方向（在XZ平面内偏移）
+        const perpO = new THREE.Vector3(-dirO.z, 0, dirO.x).normalize();
+        const offsetDist = 0.20; 
+        
+        // 第一根键
+        const bondC7O_1 = new THREE.Mesh(
+            new THREE.CylinderGeometry(doubleBondThickness, doubleBondThickness, bondLengthC7O, 12),
+            bondMat
+        );
+        bondC7O_1.position.copy(new THREE.Vector3().addVectors(c7RelPos, oRelPos).multiplyScalar(0.5).add(perpO.clone().multiplyScalar(offsetDist/2)));
+        bondC7O_1.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dirO.clone().normalize());
+        aldehydeGroup.add(bondC7O_1);
+        
+        // 第二根键
+        const bondC7O_2 = new THREE.Mesh(
+            new THREE.CylinderGeometry(doubleBondThickness, doubleBondThickness, bondLengthC7O, 12),
+            bondMat
+        );
+        bondC7O_2.position.copy(new THREE.Vector3().addVectors(c7RelPos, oRelPos).multiplyScalar(0.5).sub(perpO.clone().multiplyScalar(offsetDist/2)));
+        bondC7O_2.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dirO.clone().normalize());
+        aldehydeGroup.add(bondC7O_2);
+        
+        aldehydeGroup.position.copy(c0Pos);
+        scene.add(aldehydeGroup);
+
+        // ========== 大π键 ==========
+        const piRingGeo = new THREE.TorusGeometry(hexRadius * 0.98, 0.09, 32, 80);
+        const piRingMat = new THREE.MeshPhongMaterial({ color: 0x4477cc, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+        
+        const piRingTop = new THREE.Mesh(piRingGeo, piRingMat);
+        piRingTop.position.set(0, 0.45, 0);
+        piRingTop.rotation.x = Math.PI / 2;
+        scene.add(piRingTop);
+        
+        const piRingBottom = new THREE.Mesh(piRingGeo, piRingMat);
+        piRingBottom.position.set(0, -0.45, 0);
+        piRingBottom.rotation.x = Math.PI / 2;
+        scene.add(piRingBottom);
+        
+        const connectorMat = new THREE.LineBasicMaterial({ color: 0x4477cc, opacity: 0.1, transparent: true });
+        for (let i = 0; i < 6; i++) {
+            const angle = angles[i];
+            const x = hexRadius * 0.9 * Math.cos(angle);
+            const z = hexRadius * 0.9 * Math.sin(angle);
+            const points = [new THREE.Vector3(x, 0.45, z), new THREE.Vector3(x, -0.45, z)];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, connectorMat);
+            scene.add(line);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        console.log('苯甲醛 - 醛基与苯环共面，120°键角，C=O键长为原来的4/5，双键清晰');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

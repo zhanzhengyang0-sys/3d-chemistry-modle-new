@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+    <title>面心立方 · 极简触屏版</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        canvas { display: block; touch-action: none; }
+
+        /* ============================================================
+           控制栏：flex-wrap 自动换行，窄屏完整可见
+           ============================================================ */
+        .control-bar {
+            position: absolute;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;                /* ★ 关键：允许换行 */
+            align-items: center;
+            justify-content: center;
+            gap: 10px 14px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 8px 16px;
+            border-radius: 26px;
+            border: 1px solid #ccc;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 20;
+            pointer-events: auto;
+            line-height: 1;
+        }
+
+        /* 左侧开关组 */
+        .switch-group {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            flex: 0 0 auto;
+        }
+
+        .switch-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 30px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            font-size: 12px;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            min-height: 32px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .switch-btn:active { transform: translateY(1px); }
+        .switch-btn.blue        { background-color: #3366ff; color: white; }
+        .switch-btn.blue.off    { background-color: #cccccc; color: #666; }
+        .switch-btn.red         { background-color: #ff3333; color: white; }
+        .switch-btn.red.off     { background-color: #cccccc; color: #666; }
+        .switch-btn.diag        { background-color: #000066; color: white; }
+        .switch-btn.diag.off    { background-color: #cccccc; color: #666; }
+
+        /* 右侧选色 + 重置 */
+        .color-picker {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            padding-left: 14px;
+            border-left: 1px solid #ccc;
+            flex: 0 0 auto;
+        }
+        .color-picker span:first-child {
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .color-btn {
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            min-height: 28px;
+            border-radius: 50%;
+            border: 2px solid white;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            flex-shrink: 0;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        .color-btn.selected {
+            border: 3px solid #333;
+            transform: scale(1.08);
+            box-shadow: 0 0 0 2px gold;
+        }
+        .color-btn.red   { background-color: #ff3333; }
+        .color-btn.blue  { background-color: #3366ff; }
+        .color-btn.black { background-color: #000000; }
+
+        #current-color-status {
+            font-size: 12px;
+            color: #555;
+            background: #f0f0f0;
+            padding: 3px 8px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        .reset-btn {
+            background: rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0,0,0,0.2);
+            border-radius: 30px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
+            min-height: 32px;
+            backdrop-filter: blur(4px);
+        }
+        .reset-btn:hover  { background: rgba(0, 0, 0, 0.15); }
+        .reset-btn:active { transform: scale(0.96); }
+
+        /* 右侧触屏提示 */
+        .touch-hint-right {
+            position: absolute;
+            right: max(20px, env(safe-area-inset-right));
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            color: #ffd966;
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            border: 1px solid #ffd96666;
+            z-index: 30;
+            pointer-events: none;
+            white-space: nowrap;
+            opacity: 0.85;
+            /* bottom 由 JS 动态设置，避开控制栏 */
+            bottom: 90px;
+        }
+
+        /* ============================================================
+           触屏设备（粗指针）: 加大所有可点击目标
+           ============================================================ */
+        @media (pointer: coarse) {
+            .switch-btn {
+                padding: 8px 14px;
+                font-size: 13px;
+                min-height: 38px;
+                border-radius: 24px;
+            }
+            .color-btn {
+                width: 34px;
+                height: 34px;
+                min-width: 34px;
+                min-height: 34px;
+            }
+            .reset-btn {
+                padding: 8px 16px;
+                font-size: 13px;
+                min-height: 38px;
+            }
+            #current-color-status {
+                font-size: 13px;
+                padding: 4px 10px;
+            }
+        }
+
+        /* ============================================================
+           窄屏: 控制面板铺满宽度、自动换行、分隔线隐藏
+           ============================================================ */
+        @media (max-width: 700px) {
+            .control-bar {
+                width: calc(100vw - 16px);
+                padding: 8px 12px;
+                gap: 8px 10px;
+                border-radius: 18px;
+            }
+            .color-picker {
+                padding-left: 0;
+                border-left: none;
+                width: 100%;
+                justify-content: center;
+            }
+            .switch-group {
+                width: 100%;
+                justify-content: center;
+                gap: 6px;
+            }
+            .switch-btn {
+                padding: 6px 10px;
+                font-size: 12px;
+                min-height: 32px;
+            }
+            .color-btn {
+                width: 30px;
+                height: 30px;
+                min-width: 30px;
+                min-height: 30px;
+            }
+            .reset-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+                min-height: 30px;
+            }
+            .touch-hint-right {
+                font-size: 11px;
+                padding: 3px 12px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .control-bar {
+                padding: 6px 8px;
+                gap: 6px 8px;
+            }
+            .switch-btn {
+                padding: 5px 8px;
+                font-size: 11px;
+                min-height: 28px;
+            }
+            .color-btn {
+                width: 26px;
+                height: 26px;
+                min-width: 26px;
+                min-height: 26px;
+            }
+            .reset-btn {
+                padding: 5px 10px;
+                font-size: 11px;
+                min-height: 28px;
+            }
+        }
+    </style>
+
+    </head>
+<body>
+    <!-- 极简控制栏 -->
+    <div class="control-bar">
+        <div class="switch-group">
+            <button id="btn-blue" class="switch-btn blue off">🔵 蓝(关)</button>
+            <button id="btn-red" class="switch-btn red off">🔴 红(关)</button>
+            <button id="btn-diag" class="switch-btn diag off">⬛ 对角(关)</button>
+        </div>
+
+        <div class="color-picker">
+            <span>🎨</span>
+            <div id="color-red" class="color-btn red selected" title="红色"></div>
+            <div id="color-blue" class="color-btn blue" title="蓝色"></div>
+            <div id="color-black" class="color-btn black" title="黑色"></div>
+            <span id="current-color-status">红</span>
+            <button id="reset-colors" class="reset-btn">⟳ 重置</button>
+        </div>
+    </div>
+
+    <div class="touch-hint-right">👆 点击球换色</div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // --- 晶胞参数: 棱长 1.5 ---
+        const L = 1.5;
+        const half = L / 2;
+
+        // --- 相机 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(3.8, 2.5, 4.8);
+        camera.lookAt(half, half, half);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器（显式声明触摸手势） ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.target.set(half, half, half);
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+        light1.position.set(2, 3, 4);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffeedd, 0.8);
+        light2.position.set(-2, 1, -3);
+        scene.add(light2);
+
+        const light3 = new THREE.PointLight(0xffffff, 0.6);
+        light3.position.set(half, half + 1.5, half);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 0.5);
+        light4.position.set(half + 1.2, half, half - 1.0);
+        scene.add(light4);
+
+        // ========== 灰色棱边 ==========
+        const edgeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x888888,
+            emissive: 0x000000,
+            roughness: 0.5,
+            metalness: 0.1
+        });
+        const edgeRadius = 0.048;
+
+        function createEdge(p1, p2) {
+            const start = new THREE.Vector3(p1[0], p1[1], p1[2]);
+            const end = new THREE.Vector3(p2[0], p2[1], p2[2]);
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(edgeRadius, edgeRadius, len, 10),
+                edgeMaterial
+            );
+            const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            cylinder.position.copy(center);
+            cylinder.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                dir.clone().normalize()
+            );
+            return cylinder;
+        }
+
+        // 立方体 8 个顶点
+        const A = [0,0,0]; const B = [L,0,0];
+        const C = [0,L,0]; const D = [0,0,L];
+        const E = [L,L,0]; const F = [L,0,L];
+        const G = [0,L,L]; const H = [L,L,L];
+
+        // 12 条棱
+        scene.add(createEdge(A, B));
+        scene.add(createEdge(A, C));
+        scene.add(createEdge(A, D));
+        scene.add(createEdge(B, E));
+        scene.add(createEdge(B, F));
+        scene.add(createEdge(C, E));
+        scene.add(createEdge(C, G));
+        scene.add(createEdge(D, F));
+        scene.add(createEdge(D, G));
+        scene.add(createEdge(E, H));
+        scene.add(createEdge(F, H));
+        scene.add(createEdge(G, H));
+
+        // ========== 原子球 ==========
+        const atomRadius = 0.28;
+        const allAtomMeshes = [];
+        const sphereGeo = new THREE.SphereGeometry(atomRadius, 64, 64);
+
+        // 8 个角原子
+        [A, B, C, D, E, F, G, H].forEach(pos => {
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                emissive: 0x000000,
+                roughness: 0.3,
+                metalness: 0.0
+            });
+            const sphere = new THREE.Mesh(sphereGeo, material);
+            sphere.position.set(pos[0], pos[1], pos[2]);
+            scene.add(sphere);
+            allAtomMeshes.push(sphere);
+        });
+
+        // 6 个面心原子
+        [
+            [half, half, 0], [half, half, L],
+            [half, 0, half], [half, L, half],
+            [0, half, half], [L, half, half]
+        ].forEach(pos => {
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                emissive: 0x000000,
+                roughness: 0.3,
+                metalness: 0.0
+            });
+            const sphere = new THREE.Mesh(sphereGeo, material);
+            sphere.position.set(pos[0], pos[1], pos[2]);
+            scene.add(sphere);
+            allAtomMeshes.push(sphere);
+        });
+
+        // ========== 六边形平面 ==========
+        const bluePoints = [
+            [L, 0, 0], [half, half, 0], [0, L, 0],
+            [0, half, half], [0, 0, L], [half, 0, half]
+        ];
+        const redPoints = [
+            [L, L, 0], [L, half, half], [L, 0, L],
+            [half, half, L], [0, L, L], [half, L, half]
+        ];
+
+        function createHexagon(points, color, opacity = 0.35) {
+            if (points.length !== 6) return null;
+            const center = [0, 0, 0];
+            points.forEach(p => {
+                center[0] += p[0]; center[1] += p[1]; center[2] += p[2];
+            });
+            center[0] /= 6; center[1] /= 6; center[2] /= 6;
+
+            const vertices = [center[0], center[1], center[2]];
+            for (let i = 0; i < 6; i++) {
+                vertices.push(points[i][0], points[i][1], points[i][2]);
+            }
+            vertices.push(points[0][0], points[0][1], points[0][2]);
+
+            const indices = [];
+            for (let i = 1; i <= 6; i++) indices.push(0, i, i + 1);
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshPhongMaterial({
+                color: color,
+                transparent: true,
+                opacity: opacity,
+                side: THREE.DoubleSide,
+                emissive: 0x000000,
+                shininess: 30
+            });
+            return new THREE.Mesh(geometry, material);
+        }
+
+        function createHexagonBorder(points, color) {
+            const linePoints = [
+                points[0], points[1], points[2],
+                points[3], points[4], points[5], points[0]
+            ];
+            const pts = linePoints.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+            const geometry = new THREE.BufferGeometry().setFromPoints(pts);
+            const material = new THREE.LineBasicMaterial({ color: color });
+            return new THREE.Line(geometry, material);
+        }
+
+        const blueHexagon = createHexagon(bluePoints, 0x3366ff, 0.4);
+        blueHexagon.name = "blueHexagon";
+        blueHexagon.visible = false;
+        scene.add(blueHexagon);
+
+        const blueBorder = createHexagonBorder(bluePoints, 0x0033aa);
+        blueBorder.name = "blueBorder";
+        blueBorder.visible = false;
+        scene.add(blueBorder);
+
+        const redHexagon = createHexagon(redPoints, 0xff3333, 0.4);
+        redHexagon.name = "redHexagon";
+        redHexagon.visible = false;
+        scene.add(redHexagon);
+
+        const redBorder = createHexagonBorder(redPoints, 0xaa0000);
+        redBorder.name = "redBorder";
+        redBorder.visible = false;
+        scene.add(redBorder);
+
+        // ========== 对角线 ==========
+        const diagMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000066,
+            emissive: 0x000022,
+            roughness: 0.3,
+            metalness: 0.2,
+            transparent: true,
+            opacity: 0.55
+        });
+
+        function createDiagonal(p1, p2) {
+            const start = new THREE.Vector3(p1[0], p1[1], p1[2]);
+            const end = new THREE.Vector3(p2[0], p2[1], p2[2]);
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.035, 0.035, len, 12),
+                diagMaterial
+            );
+            const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            cylinder.position.copy(center);
+            cylinder.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                dir.clone().normalize()
+            );
+            return cylinder;
+        }
+
+        const diagonal = createDiagonal([0, 0, 0], [L, L, L]);
+        diagonal.name = "diagonal";
+        diagonal.visible = false;
+        scene.add(diagonal);
+
+        const endSphereGeo = new THREE.SphereGeometry(0.1, 32, 32);
+        const endSphereMat = new THREE.MeshStandardMaterial({
+            color: 0x000066,
+            transparent: true,
+            opacity: 0.55
+        });
+
+        const startSphere = new THREE.Mesh(endSphereGeo, endSphereMat);
+        startSphere.position.set(0, 0, 0);
+        startSphere.name = "diagStart";
+        startSphere.visible = false;
+        scene.add(startSphere);
+
+        const endSphere = new THREE.Mesh(endSphereGeo, endSphereMat);
+        endSphere.position.set(L, L, L);
+        endSphere.name = "diagEnd";
+        endSphere.visible = false;
+        scene.add(endSphere);
+
+        // 极淡坐标轴
+        const axesHelper = new THREE.AxesHelper(2.0);
+        axesHelper.material.transparent = true;
+        axesHelper.material.opacity = 0.08;
+        scene.add(axesHelper);
+
+        // ========== 开关控制（只用 click，触屏无延迟） ==========
+        const blueBtn = document.getElementById('btn-blue');
+        const redBtn = document.getElementById('btn-red');
+        const diagBtn = document.getElementById('btn-diag');
+
+        let blueVisible = false;
+        let redVisible = false;
+        let diagVisible = false;
+
+        blueBtn.addEventListener('click', () => {
+            blueVisible = !blueVisible;
+            const blueHex = scene.getObjectByName('blueHexagon');
+            const blueBrd = scene.getObjectByName('blueBorder');
+            if (blueHex) blueHex.visible = blueVisible;
+            if (blueBrd) blueBrd.visible = blueVisible;
+            blueBtn.classList.toggle('off', !blueVisible);
+            blueBtn.innerHTML = blueVisible ? '🔵 蓝(开)' : '🔵 蓝(关)';
+        });
+
+        redBtn.addEventListener('click', () => {
+            redVisible = !redVisible;
+            const redHex = scene.getObjectByName('redHexagon');
+            const redBrd = scene.getObjectByName('redBorder');
+            if (redHex) redHex.visible = redVisible;
+            if (redBrd) redBrd.visible = redVisible;
+            redBtn.classList.toggle('off', !redVisible);
+            redBtn.innerHTML = redVisible ? '🔴 红(开)' : '🔴 红(关)';
+        });
+
+        diagBtn.addEventListener('click', () => {
+            diagVisible = !diagVisible;
+            const diag = scene.getObjectByName('diagonal');
+            const startS = scene.getObjectByName('diagStart');
+            const endS = scene.getObjectByName('diagEnd');
+            if (diag) diag.visible = diagVisible;
+            if (startS) startS.visible = diagVisible;
+            if (endS) endS.visible = diagVisible;
+            diagBtn.classList.toggle('off', !diagVisible);
+            diagBtn.innerHTML = diagVisible ? '⬛ 对角(开)' : '⬛ 对角(关)';
+        });
+
+        // ========== 颜色选择（只用 click） ==========
+        const colorRedBtn = document.getElementById('color-red');
+        const colorBlueBtn = document.getElementById('color-blue');
+        const colorBlackBtn = document.getElementById('color-black');
+        const currentColorStatus = document.getElementById('current-color-status');
+        const colorButtons = [colorRedBtn, colorBlueBtn, colorBlackBtn];
+
+        let selectedColor = 0xff3333;
+
+        function selectColor(colorHex, statusText, element) {
+            selectedColor = colorHex;
+            colorButtons.forEach(btn => btn.classList.remove('selected'));
+            element.classList.add('selected');
+            currentColorStatus.innerText = statusText;
+        }
+
+        colorRedBtn.addEventListener('click',   () => selectColor(0xff3333, '红', colorRedBtn));
+        colorBlueBtn.addEventListener('click',  () => selectColor(0x3366ff, '蓝', colorBlueBtn));
+        colorBlackBtn.addEventListener('click', () => selectColor(0x000000, '黑', colorBlackBtn));
+
+        // ========== 重置所有原子颜色为黑色 ==========
+        const resetBtn = document.getElementById('reset-colors');
+        resetBtn.addEventListener('click', () => {
+            allAtomMeshes.forEach(mesh => {
+                mesh.material.color.setHex(0x000000);
+                mesh.material.emissive.setHex(0x000000);
+            });
+        });
+
+        // ============================================================
+        // 拾取：射线优先，触屏 45px 屏幕空间 fallback
+        // ============================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function doPick(clientX, clientY, pointerType) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(allAtomMeshes);
+
+            let hitMesh = null;
+            if (intersects.length > 0) {
+                hitMesh = intersects[0].object;
+            } else if (pointerType !== 'mouse') {
+                // 触屏 fallback：屏幕空间 45px 内最近的球
+                const v = new THREE.Vector3();
+                let best = null, bestDist = 45;
+                allAtomMeshes.forEach(mesh => {
+                    mesh.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = mesh; }
+                });
+                if (best) hitMesh = best;
+            }
+
+            if (!hitMesh) return;
+
+            hitMesh.material.color.setHex(selectedColor);
+            if (selectedColor === 0x000000) {
+                hitMesh.material.emissive.setHex(0x000000);
+            } else {
+                hitMesh.material.emissive.setHex(selectedColor);
+                hitMesh.material.emissive.multiplyScalar(0.15);
+            }
+        }
+
+        // ============================================================
+        // 触屏 / 鼠标 点击识别（三段式，避免拖拽旋转误改色）
+        // ============================================================
+        const activePointers = new Set();
+        let pointerDownInfo = null;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                pointerDownInfo = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch',
+                    id: e.pointerId
+                };
+            } else {
+                pointerDownInfo = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!pointerDownInfo || pointerDownInfo.id !== e.pointerId || activePointers.size !== 1) return;
+            const dx = e.clientX - pointerDownInfo.x;
+            const dy = e.clientY - pointerDownInfo.y;
+            const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+            if (dx * dx + dy * dy > thr * thr) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const countBeforeUp = activePointers.size;
+            if (pointerDownInfo && pointerDownInfo.id === e.pointerId && countBeforeUp === 1) {
+                const dx = e.clientX - pointerDownInfo.x;
+                const dy = e.clientY - pointerDownInfo.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = performance.now() - pointerDownInfo.t;
+                const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+                if (dist <= thr && dt <= 500) {
+                    doPick(e.clientX, e.clientY, pointerDownInfo.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        // window 级兜底
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            pointerDownInfo = null;
+        });
+
+        // iOS Safari 页面级双指缩放拦截
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        // 控制栏阻止事件冒泡到 canvas
+        const controlBar = document.querySelector('.control-bar');
+        controlBar.addEventListener('pointerdown', (e) => e.stopPropagation());
+        controlBar.addEventListener('pointermove', (e) => e.stopPropagation());
+
+        // ============================================================
+        // 相机自适应（横竖屏 / 窄屏）
+        // ============================================================
+        function updateCameraZoom() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const dist = camera.position.distanceTo(controls.target);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+            const baseVisibleH = 2 * dist * Math.tan(fovRad);
+            const baseVisibleW = baseVisibleH * aspect;
+
+            // 立方体 L=1.5，加原子半径 + 斜视角投影 + 边距，内容约 4.5 x 4.5
+            const contentW = 4.5;
+            const contentH = 4.5;
+
+            const zoomForW = baseVisibleW / contentW;
+            const zoomForH = baseVisibleH / contentH;
+
+            const isLandscape = aspect > 1;
+            const maxZoom = isLandscape ? 1.0 : 0.95;
+            const minZoom = isLandscape ? 0.55 : 0.32;
+
+            camera.zoom = Math.max(minZoom, Math.min(maxZoom, zoomForW, zoomForH));
+            camera.updateProjectionMatrix();
+        }
+        updateCameraZoom();
+
+        // 触屏提示动态避让控制栏
+        function updateHintPosition() {
+            const barRect = controlBar.getBoundingClientRect();
+            const hint = document.querySelector('.touch-hint-right');
+            if (!hint) return;
+            const offsetFromBottom = window.innerHeight - barRect.top + 12;
+            hint.style.bottom = offsetFromBottom + 'px';
+        }
+        updateHintPosition();
+
+        // ============================================================
+        // 动画循环
+        // ============================================================
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // ============================================================
+        // 窗口 / 屏幕变化
+        // ============================================================
+        let resizeTimer = null;
+        function onWindowResize() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                updateCameraZoom();
+                updateHintPosition();
+            }, 60);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onWindowResize, 300);
+        });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onWindowResize);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

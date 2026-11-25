@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>苯 · 点击 H 换成彩球 · 三轴旋转</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #ffffff;
+            touch-action: none;
+            position: fixed;
+            width: 100%; height: 100%;
+            -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        canvas { display: block; touch-action: none; }
+
+        #touch-hint {
+            position: absolute;
+            top: max(14px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            padding: 6px 16px;
+            border-radius: 30px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            color: #555;
+            z-index: 100;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+            max-width: calc(100vw - 24px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #bottom-panel {
+            position: absolute;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid #ccc;
+            border-radius: 22px;
+            padding: 8px 14px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 8px 12px;
+            z-index: 200;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            pointer-events: auto;
+        }
+
+        .color-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+        .picker-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            white-space: nowrap;
+        }
+        .color-dots {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .color-dot {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.9);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: transform 0.12s, box-shadow 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        .color-dot:active { transform: scale(0.88); }
+        .color-dot.active {
+            border: 3px solid #1a1a1a;
+            transform: scale(1.12);
+            box-shadow: 0 0 0 2px #ffd966;
+        }
+
+        .divider-vertical {
+            width: 1px;
+            height: 40px;
+            background: #d0d0d0;
+            flex-shrink: 0;
+        }
+
+        .sliders-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            justify-content: center;
+            align-items: stretch;
+            flex: 1 1 auto;
+        }
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            min-width: 145px;
+            flex: 0 1 auto;
+        }
+        .axis-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .axis-name {
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .slider-row input[type="range"] {
+            flex: 1;
+            height: 4px;
+            border-radius: 5px;
+            background: #d0d0d0;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            touch-action: none;
+            outline: none;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+        }
+        .slider-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #888;
+            cursor: grab;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            transition: transform 0.1s;
+        }
+        .slider-row input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.15);
+        }
+        .slider-row input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #888;
+            border: 2px solid white;
+            cursor: grab;
+        }
+        #axis1Slider::-webkit-slider-thumb { background: #ff6060; }
+        #axis1Slider::-moz-range-thumb     { background: #ff6060; }
+        #axis2Slider::-webkit-slider-thumb { background: #60ff60; }
+        #axis2Slider::-moz-range-thumb     { background: #60ff60; }
+        #axis3Slider::-webkit-slider-thumb { background: #6080ff; }
+        #axis3Slider::-moz-range-thumb     { background: #6080ff; }
+
+        .angle-badge {
+            font-weight: 700;
+            background: #f5f5f5;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            min-width: 46px;
+            text-align: center;
+            border: 1px solid;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        @media (pointer: coarse) {
+            .color-dot { width: 34px; height: 34px; }
+            .slider-row input[type="range"] { height: 8px; }
+            .slider-row input[type="range"]::-webkit-slider-thumb { width: 26px; height: 26px; }
+            .slider-row input[type="range"]::-moz-range-thumb     { width: 26px; height: 26px; }
+            .slider-item { min-width: 165px; }
+            .angle-badge { font-size: 13px; padding: 4px 12px; min-width: 52px; }
+            #bottom-panel { padding: 10px 14px; }
+        }
+
+        @media (max-width: 720px) {
+            #bottom-panel {
+                width: calc(100vw - 16px);
+                padding: 10px 12px;
+                gap: 8px;
+                border-radius: 18px;
+            }
+            .color-picker {
+                width: 100%;
+                justify-content: center;
+                padding-bottom: 8px;
+                border-bottom: 1px solid #eee;
+            }
+            .color-dots { gap: 8px; }
+            .divider-vertical { display: none; }
+            .sliders-row {
+                width: 100%;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .slider-item {
+                width: 100%;
+                min-width: 0;
+                flex-direction: row;
+                align-items: center;
+                gap: 8px;
+            }
+            .axis-label { min-width: 90px; font-size: 12px; }
+            .slider-row { flex: 1; }
+        }
+
+        @media (max-width: 420px) {
+            #bottom-panel { padding: 8px 10px; gap: 6px; }
+            .color-dot { width: 28px; height: 28px; }
+            .color-dots { gap: 6px; }
+            .axis-label { min-width: 80px; font-size: 11px; }
+            .angle-badge { font-size: 11px; min-width: 42px; padding: 3px 8px; }
+        }
+    </style>
+
+    </head>
+<body>
+    <div id="touch-hint">👆 点击氢原子 → 变为所选颜色球 · 再点变回氢</div>
+
+    <div id="bottom-panel">
+        <div class="color-picker">
+            <span class="picker-label">H →</span>
+            <div class="color-dots">
+                <div class="color-dot active" data-color="red"    title="红色" style="background:#ff4444;"></div>
+                <div class="color-dot" data-color="yellow" title="黄色" style="background:#ffcc00;"></div>
+                <div class="color-dot" data-color="green"  title="绿色" style="background:#44dd88;"></div>
+                <div class="color-dot" data-color="blue"   title="蓝色" style="background:#2196f3;"></div>
+                <div class="color-dot" data-color="purple" title="紫色" style="background:#9b59b6;"></div>
+                <div class="color-dot" data-color="black"  title="黑色" style="background:#000000;"></div>
+            </div>
+        </div>
+
+        <div class="divider-vertical"></div>
+
+        <div class="sliders-row">
+            <div class="slider-item">
+                <div class="axis-label">
+                    <span style="color:#ff6060; font-size:14px;">●</span>
+                    <span class="axis-name" style="color:#ff6060;">轴❶ C1–C4</span>
+                </div>
+                <div class="slider-row">
+                    <input type="range" id="axis1Slider" min="0" max="360" value="0" step="1">
+                    <span class="angle-badge" id="angle1Display" style="border-color:#ff8080; color:#ff6060;">0°</span>
+                </div>
+            </div>
+            <div class="slider-item">
+                <div class="axis-label">
+                    <span style="color:#60cc60; font-size:14px;">●</span>
+                    <span class="axis-name" style="color:#60cc60;">轴❷ C2–C5</span>
+                </div>
+                <div class="slider-row">
+                    <input type="range" id="axis2Slider" min="0" max="360" value="0" step="1">
+                    <span class="angle-badge" id="angle2Display" style="border-color:#80cc80; color:#60aa60;">0°</span>
+                </div>
+            </div>
+            <div class="slider-item">
+                <div class="axis-label">
+                    <span style="color:#6080ff; font-size:14px;">●</span>
+                    <span class="axis-name" style="color:#6080ff;">轴❸ C3–C6</span>
+                </div>
+                <div class="slider-row">
+                    <input type="range" id="axis3Slider" min="0" max="360" value="0" step="1">
+                    <span class="angle-badge" id="angle3Display" style="border-color:#80b0ff; color:#6080ff;">0°</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const bondLengthCC = 1.70;
+        const bondLengthCH = 1.70;
+        const radius = bondLengthCC;
+
+        const carbonPositions = [];
+        const anglesDeg = [0, 60, 120, 180, 240, 300];
+        const angles = anglesDeg.map(deg => deg * Math.PI / 180);
+
+        angles.forEach(angle => {
+            carbonPositions.push(new THREE.Vector3(
+                radius * Math.cos(angle), 0, radius * Math.sin(angle)
+            ));
+        });
+
+        const hydrogenRelPositions = carbonPositions.map(pos =>
+            pos.clone().normalize().multiplyScalar(bondLengthCH)
+        );
+
+        const centerPos = new THREE.Vector3(0, 0, 0);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5.0, 3.5, 7.5);
+        camera.lookAt(centerPos);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(centerPos);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.rotateSpeed = 0.8;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+
+        // ============================================================
+        // ★★★ 光照（上一版遗漏，本次补回原代码全部 5 个光源）★★★
+        //   没有光源时 MeshStandardMaterial 会完全黑掉
+        // ============================================================
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.0);
+        light1.position.set(5, 10, 7);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffffff, 0.6);
+        light2.position.set(-5, 3, -5);
+        scene.add(light2);
+
+        const light3 = new THREE.PointLight(0xffffff, 0.5);
+        light3.position.set(0, 5, 8);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 0.4);
+        light4.position.set(3, -2, 5);
+        scene.add(light4);
+
+        // ============================================================
+        // 材质（保持原样）
+        // ============================================================
+        const carbonMat = new THREE.MeshStandardMaterial({
+            color: 0x000000,      // 碳 = 纯黑
+            roughness: 0.25,
+            metalness: 0.1
+        });
+        const hMat = new THREE.MeshStandardMaterial({
+            color: 0x3366cc,      // 氢 = 深蓝
+            roughness: 0.2,
+            metalness: 0.0
+        });
+        const bondMat = new THREE.MeshStandardMaterial({
+            color: 0x555555,      // 键 = 深灰
+            roughness: 0.3,
+            metalness: 0.0
+        });
+
+        // 原子半径（保持原值；彩球 0.38，比 H=0.30 稍大、比 C=0.50 小）
+        const RADII = { H: 0.30, C: 0.50, colored: 0.38 };
+
+        const COLOR_VALUES = {
+            red:    0xff4444,
+            yellow: 0xffcc00,
+            green:  0x44dd88,
+            blue:   0x2196f3,
+            purple: 0x9b59b6,
+            black:  0x000000
+        };
+
+        const sphereGeomC       = new THREE.SphereGeometry(RADII.C, 64, 32);
+        const sphereGeomH       = new THREE.SphereGeometry(RADII.H, 48, 24);
+        const sphereGeomColored = new THREE.SphereGeometry(RADII.colored, 48, 24);
+        const bondGeom = new THREE.CylinderGeometry(0.08, 0.08, 1, 12);
+
+        const coloredMaterials = {};
+        Object.keys(COLOR_VALUES).forEach(key => {
+            coloredMaterials[key] = new THREE.MeshStandardMaterial({
+                color: COLOR_VALUES[key],
+                roughness: 0.2,
+                metalness: 0.05
+            });
+        });
+
+        const moleculeGroup = new THREE.Group();
+        scene.add(moleculeGroup);
+
+        // --- 碳原子 ---
+        carbonPositions.forEach(pos => {
+            const carbon = new THREE.Mesh(sphereGeomC, carbonMat);
+            carbon.position.copy(pos);
+            moleculeGroup.add(carbon);
+        });
+
+        // --- C-C 环键 ---
+        for (let i = 0; i < carbonPositions.length; i++) {
+            const j = (i + 1) % carbonPositions.length;
+            const start = carbonPositions[i];
+            const end = carbonPositions[j];
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            const cylinder = new THREE.Mesh(bondGeom, bondMat);
+            cylinder.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            cylinder.scale.set(1, len, 1);
+            moleculeGroup.add(cylinder);
+        }
+
+        // --- 环内半透明双圈 ---
+        const ringGeo = new THREE.TorusGeometry(radius * 0.96, 0.04, 16, 64);
+        const ringMat = new THREE.MeshStandardMaterial({
+            color: 0xcccccc, transparent: true, opacity: 0.15, side: THREE.DoubleSide
+        });
+        const ringTop = new THREE.Mesh(ringGeo, ringMat);
+        ringTop.position.set(0, 0.25, 0);
+        ringTop.rotation.x = Math.PI / 2;
+        moleculeGroup.add(ringTop);
+        const ringBottom = new THREE.Mesh(ringGeo, ringMat);
+        ringBottom.position.set(0, -0.25, 0);
+        ringBottom.rotation.x = Math.PI / 2;
+        moleculeGroup.add(ringBottom);
+
+        // --- 三轴彩色线条 ---
+        function createAxisLine(color, start, end) {
+            const pts = [start.clone(), end.clone()];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const mat = new THREE.LineBasicMaterial({ color });
+            return new THREE.Line(geo, mat);
+        }
+        moleculeGroup.add(createAxisLine(0xff8080, carbonPositions[0], carbonPositions[3]));
+        moleculeGroup.add(createAxisLine(0x80ff80, carbonPositions[1], carbonPositions[4]));
+        moleculeGroup.add(createAxisLine(0x80b0ff, carbonPositions[2], carbonPositions[5]));
+
+        // --- 6 个彩色轴端点小球 ---
+        const dotGeom = new THREE.SphereGeometry(0.15, 8);
+        const dotMat1 = new THREE.MeshStandardMaterial({ color: 0xff8080 });
+        const dotMat2 = new THREE.MeshStandardMaterial({ color: 0x80ff80 });
+        const dotMat3 = new THREE.MeshStandardMaterial({ color: 0x80b0ff });
+        [
+            { pos: carbonPositions[0], mat: dotMat1 },
+            { pos: carbonPositions[3], mat: dotMat1 },
+            { pos: carbonPositions[1], mat: dotMat2 },
+            { pos: carbonPositions[4], mat: dotMat2 },
+            { pos: carbonPositions[2], mat: dotMat3 },
+            { pos: carbonPositions[5], mat: dotMat3 }
+        ].forEach(item => {
+            const dot = new THREE.Mesh(dotGeom, item.mat);
+            dot.position.copy(item.pos);
+            moleculeGroup.add(dot);
+        });
+
+        // ============================================================
+        // 可替换原子：初始 6 个 H
+        // ============================================================
+        const clickableAtoms = [];
+        const switchableAtoms = [];
+
+        for (let i = 0; i < carbonPositions.length; i++) {
+            const cPos = carbonPositions[i];
+            const hRelPos = hydrogenRelPositions[i];
+            const hPos = cPos.clone().add(hRelPos);
+
+            const hMesh = new THREE.Mesh(sphereGeomH, hMat);
+            hMesh.position.copy(hPos);
+
+            const dir = hRelPos.clone().normalize();
+            const len = hRelPos.length();
+            const cylinder = new THREE.Mesh(bondGeom, bondMat);
+            cylinder.position.copy(cPos.clone().add(hRelPos.clone().multiplyScalar(0.5)));
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            cylinder.scale.set(1, len, 1);
+
+            moleculeGroup.add(hMesh);
+            moleculeGroup.add(cylinder);
+            clickableAtoms.push(hMesh);
+
+            switchableAtoms.push({
+                mesh: hMesh,
+                type: 'H',
+                index: i,
+                position: hPos.clone(),
+                cPos: cPos.clone(),
+                relPos: hRelPos.clone()
+            });
+        }
+
+        // ============================================================
+        // 三轴旋转
+        // ============================================================
+        const axis1Dir = new THREE.Vector3().subVectors(carbonPositions[3], carbonPositions[0]).normalize();
+        const axis2Dir = new THREE.Vector3().subVectors(carbonPositions[4], carbonPositions[1]).normalize();
+        const axis3Dir = new THREE.Vector3().subVectors(carbonPositions[5], carbonPositions[2]).normalize();
+
+        let angle1 = 0, angle2 = 0, angle3 = 0;
+        const slider1 = document.getElementById('axis1Slider');
+        const slider2 = document.getElementById('axis2Slider');
+        const slider3 = document.getElementById('axis3Slider');
+        const disp1 = document.getElementById('angle1Display');
+        const disp2 = document.getElementById('angle2Display');
+        const disp3 = document.getElementById('angle3Display');
+
+        function updateRotation() {
+            const q1 = new THREE.Quaternion().setFromAxisAngle(axis1Dir, THREE.MathUtils.degToRad(angle1));
+            const q2 = new THREE.Quaternion().setFromAxisAngle(axis2Dir, THREE.MathUtils.degToRad(angle2));
+            const q3 = new THREE.Quaternion().setFromAxisAngle(axis3Dir, THREE.MathUtils.degToRad(angle3));
+            moleculeGroup.quaternion.copy(q3.clone().multiply(q2).multiply(q1));
+        }
+        [slider1, slider2, slider3].forEach((sl, i) => {
+            const handler = () => {
+                if (i === 0) { angle1 = parseInt(sl.value); disp1.textContent = angle1 + '°'; }
+                if (i === 1) { angle2 = parseInt(sl.value); disp2.textContent = angle2 + '°'; }
+                if (i === 2) { angle3 = parseInt(sl.value); disp3.textContent = angle3 + '°'; }
+                updateRotation();
+            };
+            sl.addEventListener('input', handler);
+            sl.addEventListener('change', handler);
+        });
+        updateRotation();
+
+        // ============================================================
+        // 颜色选择器
+        // ============================================================
+        let selectedColorKey = 'red';
+        const colorDots = document.querySelectorAll('.color-dot');
+        colorDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                selectedColorKey = dot.dataset.color;
+                colorDots.forEach(d => d.classList.remove('active'));
+                dot.classList.add('active');
+            });
+        });
+
+        // ============================================================
+        // 原子替换：H ↔ colored
+        // ============================================================
+        function createAtomMesh(type, colorKey) {
+            if (type === 'H') {
+                return new THREE.Mesh(sphereGeomH, hMat);
+            }
+            return new THREE.Mesh(sphereGeomColored, coloredMaterials[colorKey]);
+        }
+
+        function swapAtom(atomData, newType, colorKey) {
+            const oldMesh = atomData.mesh;
+            const pos = atomData.position.clone();
+
+            moleculeGroup.remove(oldMesh);
+            const ci = clickableAtoms.indexOf(oldMesh);
+            if (ci > -1) clickableAtoms.splice(ci, 1);
+
+            const newMesh = createAtomMesh(newType, colorKey);
+            newMesh.position.copy(pos);
+            moleculeGroup.add(newMesh);
+            clickableAtoms.push(newMesh);
+
+            atomData.mesh = newMesh;
+            atomData.type = newType;
+            atomData.colorKey = colorKey || null;
+        }
+
+        // ============================================================
+        // 拾取：射线优先，触屏 45px fallback
+        // ============================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function doPick(clientX, clientY, pointerType) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(clickableAtoms, false);
+
+            let hitMesh = null;
+            if (intersects.length > 0) {
+                hitMesh = intersects[0].object;
+            } else if (pointerType !== 'mouse') {
+                const v = new THREE.Vector3();
+                let best = null, bestDist = 45;
+                clickableAtoms.forEach(atom => {
+                    atom.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = atom; }
+                });
+                if (best) hitMesh = best;
+            }
+            if (!hitMesh) return;
+
+            const atomData = switchableAtoms.find(r => r.mesh === hitMesh);
+            if (!atomData) return;
+
+            if (atomData.type === 'H') {
+                swapAtom(atomData, 'colored', selectedColorKey);
+            } else {
+                swapAtom(atomData, 'H');
+            }
+        }
+
+        // ============================================================
+        // 触屏 / 鼠标 点击识别（三段式）
+        // ============================================================
+        const activePointers = new Set();
+        let pointerDownInfo = null;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                pointerDownInfo = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch',
+                    id: e.pointerId
+                };
+            } else {
+                pointerDownInfo = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!pointerDownInfo || pointerDownInfo.id !== e.pointerId || activePointers.size !== 1) return;
+            const dx = e.clientX - pointerDownInfo.x;
+            const dy = e.clientY - pointerDownInfo.y;
+            const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+            if (dx * dx + dy * dy > thr * thr) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const countBeforeUp = activePointers.size;
+            if (pointerDownInfo && pointerDownInfo.id === e.pointerId && countBeforeUp === 1) {
+                const dx = e.clientX - pointerDownInfo.x;
+                const dy = e.clientY - pointerDownInfo.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = performance.now() - pointerDownInfo.t;
+                const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+                if (dist <= thr && dt <= 500) {
+                    doPick(e.clientX, e.clientY, pointerDownInfo.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            pointerDownInfo = null;
+        });
+
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        const bottomPanel = document.getElementById('bottom-panel');
+        bottomPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+        bottomPanel.addEventListener('pointermove', (e) => e.stopPropagation());
+
+        // ============================================================
+        // 相机自适应
+        // ============================================================
+        function updateCameraZoom() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const dist = camera.position.distanceTo(controls.target);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+            const baseVisibleH = 2 * dist * Math.tan(fovRad);
+            const baseVisibleW = baseVisibleH * aspect;
+
+            const contentW = 8.5;
+            const contentH = 8.5;
+
+            const zoomForW = baseVisibleW / contentW;
+            const zoomForH = baseVisibleH / contentH;
+
+            const isLandscape = aspect > 1;
+            const maxZoom = isLandscape ? 1.0 : 0.95;
+            const minZoom = isLandscape ? 0.55 : 0.32;
+
+            camera.zoom = Math.max(minZoom, Math.min(maxZoom, zoomForW, zoomForH));
+            camera.updateProjectionMatrix();
+        }
+        updateCameraZoom();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        let resizeTimer = null;
+        function onWindowResize() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                updateCameraZoom();
+            }, 60);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 300));
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onWindowResize);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

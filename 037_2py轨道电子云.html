@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2py轨道电子云 - 超细轴(再减半) · 箭头合一 · 极限密度</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: black; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* 修改：最上部文本框只保留蓝色轨道名称，删除其他所有描述文字 */
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 12px 28px;
+            border-radius: 50px;
+            font-size: 20px;
+            border: 1px solid #3a6f9c;
+            z-index: 10;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 0 25px rgba(0,80,160,0.3);
+            letter-spacing: 0.5px;
+        }
+        #info span {
+            color: #a0e0ff;
+            font-weight: 700;
+            text-shadow: 0 0 10px #0088ff;
+        }
+        /* 最下部的文本框完全移除 */
+        .note {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 修改：只保留蓝色轨道名称，删除"· 极限密度 (800,000 光点) · 超细轴(0.08) · 箭头合一 · 朝向Y轴"等所有额外文字 -->
+    <div id="info">✨ <span>2p<span style="font-style:italic;">y</span> 轨道</span></div>
+    <!-- 最下部的文本框已移除（通过CSS .note { display: none; }） -->
+    <!-- 注意：坐标轴的XYZ标签保留完整，未做任何修改 -->
+
+    <!-- 引入 Three.js 核心库和辅助库 -->
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+
+        // --- 相机 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(22, 8, 22);
+        camera.lookAt(0, 0, 0);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // --- CSS2渲染器 (标签) ---
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+
+        // --- 轨道控制器 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.9;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+
+        // --- 星星背景 ---
+        function addStars() {
+            const starsGeo = new THREE.BufferGeometry();
+            const starsCount = 3000;
+            const positions = new Float32Array(starsCount * 3);
+            for (let i = 0; i < starsCount; i++) {
+                const r = 150 + Math.random() * 200;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+                positions[i*3+2] = r * Math.cos(phi);
+            }
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const starsMat = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.3, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending });
+            const stars = new THREE.Points(starsGeo, starsMat);
+            scene.add(stars);
+        }
+        addStars();
+
+        // ========== 1. 超细坐标轴 (粗细为之前的一半: 0.08) ==========
+        const axisLength = 15;       // 轴总长度
+        const axisThickness = 0.08;  // 超细 (原0.16的一半)
+        
+        // 箭头与轴体重合所需的重叠量
+        const arrowOverlap = 0.2;     
+        const axisCoreLength = axisLength - arrowOverlap; 
+
+        function createAxisSegment(start, end, color, thickness = 0.08) {
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(thickness, thickness, length, 6),
+                new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.25 })
+            );
+            
+            cylinder.position.copy(center);
+            cylinder.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                direction.clone().normalize()
+            );
+            
+            return cylinder;
+        }
+
+        // 定义端点
+        const xNeg = new THREE.Vector3(-axisLength, 0, 0);
+        const xPosShort = new THREE.Vector3(axisLength - arrowOverlap, 0, 0);
+        const yNeg = new THREE.Vector3(0, -axisLength, 0);
+        const yPosShort = new THREE.Vector3(0, axisLength - arrowOverlap, 0);
+        const zNeg = new THREE.Vector3(0, 0, -axisLength);
+        const zPosShort = new THREE.Vector3(0, 0, axisLength - arrowOverlap);
+
+        // 创建超细轴线
+        const axisX = createAxisSegment(xNeg, xPosShort, 0x3366ff, 0.08);
+        const axisY = createAxisSegment(yNeg, yPosShort, 0xffaa00, 0.08);
+        const axisZ = createAxisSegment(zNeg, zPosShort, 0xff3333, 0.08);
+        
+        scene.add(axisX);
+        scene.add(axisY);
+        scene.add(axisZ);
+
+        // ========== 2. 正向箭头 (与轴体重合) ==========
+        function createOverlapArrow(dir, color, pos, length = 1.2, headLength = 0.6, headWidth = 0.3) {
+            const arrow = new THREE.ArrowHelper(dir, pos, length, color, headLength, headWidth);
+            return arrow;
+        }
+
+        const arrowLength = 1.2;          
+        const headLength = 0.6;            
+
+        // X正向箭头
+        const arrowX = createOverlapArrow(
+            new THREE.Vector3(1, 0, 0), 
+            0x3366ff, 
+            new THREE.Vector3(axisLength - arrowOverlap, 0, 0), 
+            arrowLength, headLength, 0.3
+        );
+        
+        // Y正向箭头
+        const arrowY = createOverlapArrow(
+            new THREE.Vector3(0, 1, 0), 
+            0xffaa00, 
+            new THREE.Vector3(0, axisLength - arrowOverlap, 0), 
+            arrowLength, headLength, 0.3
+        );
+        
+        // Z正向箭头
+        const arrowZ = createOverlapArrow(
+            new THREE.Vector3(0, 0, 1), 
+            0xff3333, 
+            new THREE.Vector3(0, 0, axisLength - arrowOverlap), 
+            arrowLength, headLength, 0.3
+        );
+
+        scene.add(arrowX);
+        scene.add(arrowY);
+        scene.add(arrowZ);
+
+        // ========== 3. 负向部分无球体 ==========
+
+        // 添加 CSS 标签 (完整保留XYZ坐标轴标签，未做任何修改)
+        const createLabel = (text, pos, color, offset = 1.08) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            div.style.color = color;
+            div.style.fontSize = '20px';
+            div.style.fontWeight = '600';
+            div.style.textShadow = '0 0 12px black';
+            div.style.background = 'rgba(10,10,10,0.7)';
+            div.style.padding = '2px 12px';
+            div.style.borderRadius = '20px';
+            div.style.border = '1px solid ' + color;
+            div.style.backdropFilter = 'blur(4px)';
+            const label = new CSS2DObject(div);
+            label.position.copy(pos.clone().multiplyScalar(offset));
+            return label;
+        };
+
+        const xPosFull = new THREE.Vector3(axisLength, 0, 0);
+        const yPosFull = new THREE.Vector3(0, axisLength, 0);
+        const zPosFull = new THREE.Vector3(0, 0, axisLength);
+        
+        scene.add(createLabel('X+', xPosFull, '#88aaff', 1.06));
+        scene.add(createLabel('Y+', yPosFull, '#ffbb55', 1.06));
+        scene.add(createLabel('Z+', zPosFull, '#ff8888', 1.06));
+        scene.add(createLabel('X-', xNeg, '#88aaff', 1.06));
+        scene.add(createLabel('Y-', yNeg, '#ffbb55', 1.06));
+        scene.add(createLabel('Z-', zNeg, '#ff8888', 1.06));
+
+        // 原子核
+        const nucleus = new THREE.Mesh(new THREE.SphereGeometry(0.4, 24, 24), new THREE.MeshStandardMaterial({ color: 0xcccccc, emissive: 0x333333 }));
+        scene.add(nucleus);
+
+        // ========== 4. 生成 2py 轨道电子云 (800,000点, 沿Y轴) ==========
+        const pointCount = 800000;
+        const pointSize = 0.025;
+
+        const pointMaterial = new THREE.PointsMaterial({ 
+            color: 0xffaa55,        // 暖色调区分py轨道
+            size: pointSize,
+            sizeAttenuation: true,
+            blending: THREE.AdditiveBlending,
+            opacity: 0.95,
+            transparent: true
+        });
+
+        // 2py轨道的角度部分: sin^2(theta) * sin^2(phi) 对应沿Y轴方向
+        function pdf_py(theta, phi) {
+            // Y轴取向: (Y = r sin theta sin phi) 对应的概率振幅最大
+            // 角度部分波函数类似 Y = sin(theta) * sin(phi) -> 概率为 sin^2(theta) * sin^2(phi)
+            return Math.pow(Math.sin(theta), 2) * Math.pow(Math.sin(phi), 2);
+        }
+
+        function radialWeight(r) {
+            if (r < 1.6 || r > 8.8) return 0;
+            return Math.exp(-Math.pow((r - 4.7) / 1.9, 2));
+        }
+
+        function generatePyPoints(count) {
+            const positions = new Float32Array(count * 3);
+            let idx = 0;
+            const maxAngleVal = 1.0;
+            
+            let attempts = 0;
+            const maxAttempts = count * 60;
+            
+            while (idx < count && attempts < maxAttempts) {
+                attempts++;
+                
+                const theta = Math.acos(2 * Math.random() - 1);
+                const phi = Math.random() * Math.PI * 2;
+                
+                const angleProb = pdf_py(theta, phi);
+                
+                const r = 1.8 + Math.random() * 6.8; 
+                const radProb = radialWeight(r);
+                
+                if (angleProb * radProb > Math.random() * maxAngleVal) {
+                    const x = r * Math.sin(theta) * Math.cos(phi);
+                    const y = r * Math.sin(theta) * Math.sin(phi);
+                    const z = r * Math.cos(theta);
+                    
+                    positions[idx*3] = x;
+                    positions[idx*3+1] = y;
+                    positions[idx*3+2] = z;
+                    idx++;
+                }
+            }
+            
+            console.log(`生成点数: ${idx} / ${count}`);
+            
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(0, idx*3), 3));
+            return geometry;
+        }
+
+        console.log("生成 800,000 点云 (2py轨道)...");
+        const pyGeometry = generatePyPoints(pointCount);
+        const pyPoints = new THREE.Points(pyGeometry, pointMaterial);
+        scene.add(pyPoints);
+        console.log("点云完成");
+
+        // 光源
+        const ambient = new THREE.AmbientLight(0x404060);
+        scene.add(ambient);
+        const light1 = new THREE.PointLight(0x4466ff, 0.2, 50);
+        light1.position.set(18, 6, 6);
+        scene.add(light1);
+        const light2 = new THREE.PointLight(0xffaa33, 0.2, 50);
+        light2.position.set(-6, 18, 6);
+        scene.add(light2);
+        const light3 = new THREE.PointLight(0xff5533, 0.2, 50);
+        light3.position.set(6, -6, 18);
+        scene.add(light3);
+
+        scene.fog = new THREE.FogExp2(0x000000, 0.008);
+
+        // ========== 动画 ==========
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

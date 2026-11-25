@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NaCl晶胞 - 八面体空隙可视化 | 触屏优化</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            touch-action: none;
+        }
+        
+        /* 底部一体化提示框 + 开关 */
+        .control-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 48px;
+            padding: 8px 20px 8px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 100;
+            pointer-events: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            font-family: monospace;
+            letter-spacing: 0.3px;
+        }
+        
+        .info-text {
+            color: #f0f0f0;
+            font-size: 14px;
+            font-weight: 500;
+            text-shadow: 0 0 4px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        
+        /* 开关样式 - 与提示框融为一体 */
+        .toggle-all-btn {
+            background: rgba(255, 100, 100, 0.25);
+            border: 1px solid rgba(255, 120, 120, 0.7);
+            border-radius: 32px;
+            padding: 5px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffbbbb;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: monospace;
+            backdrop-filter: blur(4px);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        
+        .toggle-all-btn:hover {
+            background: rgba(255, 100, 100, 0.45);
+            color: white;
+            border-color: #ff8888;
+            transform: scale(1.02);
+        }
+        
+        .toggle-all-btn:active {
+            transform: scale(0.98);
+        }
+        
+        /* 适配小屏幕 */
+        @media (max-width: 550px) {
+            .control-bar {
+                padding: 5px 14px 5px 18px;
+                gap: 10px;
+                bottom: 12px;
+            }
+            .info-text {
+                font-size: 11px;
+            }
+            .toggle-all-btn {
+                padding: 3px 12px;
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 底部一体化控制栏：提示文字 + 全局隐藏/显示开关 -->
+    <div class="control-bar">
+        <span class="info-text">🔵 点击蓝色球 (Na⁺) 显示/隐藏八面体空隙</span>
+        <button id="globalToggleBtn" class="toggle-all-btn">🔘 全部隐藏</button>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景、相机、渲染器 (白色背景) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setClearColor(0xffffff, 1);
+        document.body.appendChild(renderer.domElement);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(2.6, 1.8, 3.6);
+        camera.lookAt(0, 0, 0);
+        
+        // --- 轨道控制器: 完美适配触屏 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.rotateSpeed = 1.2;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.8;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.enableTouchRotate = true;
+        controls.touchRotate = true;
+        controls.target.set(0, 0, 0);
+        controls.maxPolarAngle = Math.PI;
+        
+        // --- 灯光系统: 球面更光滑，减少生硬反光点，增强质感 ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        
+        // 主光源: 柔和方向光
+        const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.0);
+        mainLight.position.set(2, 3, 2.5);
+        scene.add(mainLight);
+        
+        // 辅助填充光 (暖色)
+        const fillLight = new THREE.PointLight(0xffccaa, 0.5);
+        fillLight.position.set(1.5, 1, 2);
+        scene.add(fillLight);
+        
+        // 冷色背光增强立体感
+        const backLight = new THREE.PointLight(0xaaccff, 0.45);
+        backLight.position.set(-2, 0.5, -2.5);
+        scene.add(backLight);
+        
+        // 侧光均匀分布
+        const sideLight = new THREE.PointLight(0xffffff, 0.4);
+        sideLight.position.set(-2, 1.2, 1.8);
+        scene.add(sideLight);
+        
+        // 底部柔光
+        const bottomFill = new THREE.PointLight(0x88aacc, 0.25);
+        bottomFill.position.set(0, -2, 0);
+        scene.add(bottomFill);
+        
+        // 增加一个微弱的全局填充，让球面更光滑均匀
+        const globalFill = new THREE.PointLight(0xffffff, 0.3);
+        globalFill.position.set(0.5, 1, 1);
+        scene.add(globalFill);
+        
+        // 极淡雾效增强层次
+        scene.fog = new THREE.FogExp2(0xffffff, 0.007);
+        
+        // ========= 1. 离子球体材质: 光滑且减少强烈高光点 =========
+        // 氯离子 (深绿色) - 提高光滑度 (roughness降低)
+        const clMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1e5a3a,
+            emissive: 0x0a2a1a,
+            roughness: 0.28,          // 更光滑，反射更柔和
+            metalness: 0.08,
+            emissiveIntensity: 0.07,
+            flatShading: false
+        });
+        
+        // 钠离子 (深蓝色) - 同样光滑
+        const naMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a4a6e,
+            emissive: 0x0a1a2a,
+            roughness: 0.3,
+            metalness: 0.08,
+            emissiveIntensity: 0.07
+        });
+        
+        const clRadius = 0.18;
+        const naRadius = 0.128;
+        
+        // 坐标定义
+        const cornerPositions = [
+            [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5],
+            [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]
+        ];
+        const facePositions = [
+            [0.5, 0, 0], [-0.5, 0, 0], [0, 0.5, 0], [0, -0.5, 0], [0, 0, 0.5], [0, 0, -0.5]
+        ];
+        
+        // 所有钠离子位置 (体心 + 12个棱心)
+        const centerPos = [0, 0, 0];
+        const edgePositions = [
+            [0.5, 0.5, 0], [0.5, -0.5, 0], [-0.5, 0.5, 0], [-0.5, -0.5, 0],
+            [0.5, 0, 0.5], [0.5, 0, -0.5], [-0.5, 0, 0.5], [-0.5, 0, -0.5],
+            [0, 0.5, 0.5], [0, 0.5, -0.5], [0, -0.5, 0.5], [0, -0.5, -0.5]
+        ];
+        const allSodiumPositions = [centerPos, ...edgePositions];
+        
+        // 存储所有钠离子Mesh，用于射线检测和八面体管理
+        const sodiumMeshes = [];
+        // 存储每个钠离子对应的八面体Group (允许多个同时显示)
+        const octahedronMap = new Map(); // key: sodiumMesh, value: { group, position }
+        
+        function addSphere(pos, material, radius) {
+            // 增加几何体细分，让球面更光滑
+            const geometry = new THREE.SphereGeometry(radius, 64, 48);
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.set(pos[0], pos[1], pos[2]);
+            scene.add(sphere);
+            return sphere;
+        }
+        
+        // 添加氯离子
+        cornerPositions.forEach(pos => addSphere(pos, clMaterial, clRadius));
+        facePositions.forEach(pos => addSphere(pos, clMaterial, clRadius));
+        
+        // 添加钠离子
+        allSodiumPositions.forEach(pos => {
+            const sphere = addSphere(pos, naMaterial, naRadius);
+            sodiumMeshes.push({ mesh: sphere, position: pos });
+        });
+        
+        // ========= 2. 晶胞棱边 (黑灰色，细圆柱) =========
+        const edgeMaterialLine = new THREE.MeshStandardMaterial({
+            color: 0x555555,
+            roughness: 0.5,
+            metalness: 0.1
+        });
+        const edgeThick = 0.016;
+        const endpoints = [
+            [[-0.5, -0.5, -0.5], [0.5, -0.5, -0.5]], [[0.5, -0.5, -0.5], [0.5, -0.5, 0.5]],
+            [[0.5, -0.5, 0.5], [-0.5, -0.5, 0.5]], [[-0.5, -0.5, 0.5], [-0.5, -0.5, -0.5]],
+            [[-0.5, 0.5, -0.5], [0.5, 0.5, -0.5]], [[0.5, 0.5, -0.5], [0.5, 0.5, 0.5]],
+            [[0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]], [[-0.5, 0.5, 0.5], [-0.5, 0.5, -0.5]],
+            [[-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5]], [[0.5, -0.5, -0.5], [0.5, 0.5, -0.5]],
+            [[0.5, -0.5, 0.5], [0.5, 0.5, 0.5]], [[-0.5, -0.5, 0.5], [-0.5, 0.5, 0.5]]
+        ];
+        
+        endpoints.forEach(edge => {
+            const start = new THREE.Vector3(edge[0][0], edge[0][1], edge[0][2]);
+            const end = new THREE.Vector3(edge[1][0], edge[1][1], edge[1][2]);
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(edgeThick, edgeThick, len, 8), edgeMaterialLine);
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+            cylinder.position.copy(center);
+            scene.add(cylinder);
+        });
+        
+        // ========= 3. 八面体构建 (正八面体，红色半透明面 + 棱边) =========
+        // 根据钠离子位置计算六个顶点 (氯离子位置，自动扩展到相邻晶胞)
+        function getOctahedronVertices(sodPos) {
+            const [x, y, z] = sodPos;
+            return [
+                new THREE.Vector3(x + 0.5, y, z),   // 右
+                new THREE.Vector3(x - 0.5, y, z),   // 左
+                new THREE.Vector3(x, y + 0.5, z),   // 上
+                new THREE.Vector3(x, y - 0.5, z),   // 下
+                new THREE.Vector3(x, y, z + 0.5),   // 前
+                new THREE.Vector3(x, y, z - 0.5)    // 后
+            ];
+        }
+        
+        // 创建八面体组
+        function createOctahedronGroup(centerPosition) {
+            const vertices = getOctahedronVertices(centerPosition);
+            const [right, left, top, bottom, front, back] = vertices;
+            const group = new THREE.Group();
+            
+            // 红色半透明材质，双面显示，深度写入正常保证正确遮挡关系
+            const faceMaterial = new THREE.MeshPhongMaterial({
+                color: 0xdd5555,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.48,
+                emissive: 0x331100,
+                shininess: 50,
+                depthWrite: true
+            });
+            
+            function addTriangle(p1, p2, p3, mat, grp) {
+                const geom = new THREE.BufferGeometry();
+                const verts = [p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z];
+                geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+                // 计算法线
+                const normal = new THREE.Vector3();
+                const edgeA = new THREE.Vector3().subVectors(p2, p1);
+                const edgeB = new THREE.Vector3().subVectors(p3, p1);
+                normal.crossVectors(edgeA, edgeB).normalize();
+                const norms = [normal.x, normal.y, normal.z, normal.x, normal.y, normal.z, normal.x, normal.y, normal.z];
+                geom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(norms), 3));
+                geom.setIndex([0,1,2]);
+                const mesh = new THREE.Mesh(geom, mat);
+                grp.add(mesh);
+            }
+            
+            // 上半部四面
+            addTriangle(top, right, front, faceMaterial, group);
+            addTriangle(top, left, front, faceMaterial, group);
+            addTriangle(top, right, back, faceMaterial, group);
+            addTriangle(top, left, back, faceMaterial, group);
+            // 下半部四面
+            addTriangle(bottom, right, front, faceMaterial, group);
+            addTriangle(bottom, left, front, faceMaterial, group);
+            addTriangle(bottom, right, back, faceMaterial, group);
+            addTriangle(bottom, left, back, faceMaterial, group);
+            
+            // 红色棱边线条
+            const edgePairs = [
+                [top, right], [top, left], [top, front], [top, back],
+                [bottom, right], [bottom, left], [bottom, front], [bottom, back],
+                [right, front], [right, back], [left, front], [left, back]
+            ];
+            const linePoints = [];
+            edgePairs.forEach(pair => {
+                linePoints.push(pair[0].clone(), pair[1].clone());
+            });
+            const lineGeom = new THREE.BufferGeometry();
+            const posArray = [];
+            linePoints.forEach(v => { posArray.push(v.x, v.y, v.z); });
+            lineGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArray), 3));
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xdd6666 });
+            const wireframe = new THREE.LineSegments(lineGeom, lineMat);
+            group.add(wireframe);
+            
+            return group;
+        }
+        
+        // ========= 4. 交互: 点击蓝色球切换八面体 =========
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        
+        function onCanvasClick(event) {
+            // 兼容触摸和鼠标
+            let clientX, clientY;
+            if (event.touches) {
+                if (event.touches.length === 0) return;
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+                event.preventDefault();
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+            
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(sodiumMeshes.map(item => item.mesh));
+            
+            if (intersects.length > 0) {
+                const hitMesh = intersects[0].object;
+                const sodiumData = sodiumMeshes.find(item => item.mesh === hitMesh);
+                if (sodiumData) {
+                    toggleOctahedron(sodiumData.mesh, sodiumData.position);
+                }
+            }
+        }
+        
+        // 切换单个八面体显示/隐藏
+        function toggleOctahedron(mesh, position) {
+            const existing = octahedronMap.get(mesh);
+            if (existing) {
+                scene.remove(existing.group);
+                octahedronMap.delete(mesh);
+                updateGlobalButtonState();
+            } else {
+                const octaGroup = createOctahedronGroup(position);
+                scene.add(octaGroup);
+                octahedronMap.set(mesh, { group: octaGroup, position: position });
+                updateGlobalButtonState();
+            }
+        }
+        
+        // 全局隐藏所有八面体
+        function hideAllOctahedrons() {
+            for (const [mesh, data] of octahedronMap.entries()) {
+                scene.remove(data.group);
+            }
+            octahedronMap.clear();
+            updateGlobalButtonState();
+        }
+        
+        // 全局显示所有八面体 (根据当前已有的钠离子位置，重新创建所有未显示的八面体)
+        // 注意: 此操作会显示所有钠离子对应的八面体，与“全部隐藏”对应
+        function showAllOctahedrons() {
+            // 遍历所有钠离子，如果尚未显示则创建
+            for (const item of sodiumMeshes) {
+                if (!octahedronMap.has(item.mesh)) {
+                    const octaGroup = createOctahedronGroup(item.position);
+                    scene.add(octaGroup);
+                    octahedronMap.set(item.mesh, { group: octaGroup, position: item.position });
+                }
+            }
+            updateGlobalButtonState();
+        }
+        
+        // 更新全局按钮的文字状态
+        function updateGlobalButtonState() {
+            const btn = document.getElementById('globalToggleBtn');
+            if (!btn) return;
+            if (octahedronMap.size === sodiumMeshes.length) {
+                btn.textContent = '🔴 全部隐藏';
+                btn.style.borderColor = '#ff8888';
+            } else if (octahedronMap.size === 0) {
+                btn.textContent = '🔘 全部显示';
+                btn.style.borderColor = 'rgba(255, 120, 120, 0.7)';
+            } else {
+                btn.textContent = '🔘 全部显示';
+                btn.style.borderColor = '#ffaa88';
+            }
+        }
+        
+        // 全局开关的点击逻辑: 如果当前有任意八面体未显示，则显示所有；否则全部隐藏
+        function onGlobalToggle() {
+            if (octahedronMap.size === sodiumMeshes.length) {
+                // 全部已显示 -> 全部隐藏
+                hideAllOctahedrons();
+            } else {
+                // 存在未显示的 -> 全部显示
+                showAllOctahedrons();
+            }
+        }
+        
+        // 注册事件
+        renderer.domElement.addEventListener('click', onCanvasClick);
+        renderer.domElement.addEventListener('touchstart', onCanvasClick, { passive: false });
+        
+        // 防止触摸时页面滚动
+        renderer.domElement.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) e.preventDefault();
+        }, { passive: false });
+        
+        // 全局按钮
+        const globalBtn = document.getElementById('globalToggleBtn');
+        if (globalBtn) {
+            globalBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onGlobalToggle();
+            });
+        }
+        
+        // 辅助: 确保body无滚动条
+        document.body.style.margin = '0';
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        
+        // 初始提示按钮状态
+        updateGlobalButtonState();
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        window.addEventListener('resize', onWindowResize);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        console.log('NaCl晶胞已启动 | 光滑球面 + 一体式控制栏 | 点击蓝色球切换八面体，右侧开关控制全局');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

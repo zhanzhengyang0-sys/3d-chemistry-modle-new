@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+    <title>B₁₂ 正二十面体 · 3D 球棍模型</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #ffffff;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #legend {
+            position: absolute;
+            bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            padding: 5px 14px;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            font-size: 11px;
+            color: #444;
+            z-index: 100;
+            display: flex;
+            gap: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        #controls-bar {
+            position: absolute;
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            padding: 4px 16px;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #ddd;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            height: 28px;
+            font-size: 12px;
+            color: #333;
+            touch-action: none;
+            pointer-events: auto;
+            white-space: nowrap;
+        }
+        #controls-bar label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            user-select: none;
+        }
+        #controls-bar input {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: #e67e22;
+            cursor: pointer;
+        }
+        @media (max-width: 480px) {
+            #legend {
+                font-size: 10px;
+                padding: 4px 12px;
+                gap: 10px;
+            }
+            .legend-dot {
+                width: 9px;
+                height: 9px;
+            }
+            #controls-bar {
+                font-size: 11px;
+                padding: 3px 12px;
+                gap: 10px;
+                height: 26px;
+            }
+            #controls-bar input {
+                width: 13px;
+                height: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#e67e22;"></div>B</div>
+    </div>
+
+    <div id="controls-bar">
+        <label>
+            <input type="checkbox" id="vertexToggle" checked>
+            顶点
+        </label>
+        <label>
+            <input type="checkbox" id="edgeToggle" checked>
+            棱键
+        </label>
+        <label>
+            <input type="checkbox" id="faceToggle">
+            二十面体面
+        </label>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.rotateSpeed = 0.9;
+        controls.zoomSpeed = 0.9;
+        controls.panSpeed = 0.9;
+        controls.target.set(0, 0, 0);
+
+        function fitCameraToScreen() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const aspect = w / h;
+
+            let dist;
+            if (aspect < 1) dist = 6.5;
+            else if (aspect < 1.6) dist = 5.8;
+            else dist = 5.2;
+
+            const dir = new THREE.Vector3(1.0, 0.75, 1.3).normalize();
+            camera.position.copy(dir.multiplyScalar(dist));
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            controls.update();
+        }
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        const d1 = new THREE.DirectionalLight(0xffffff, 0.9);
+        d1.position.set(5, 8, 6);
+        scene.add(d1);
+        const d2 = new THREE.DirectionalLight(0xccddff, 0.5);
+        d2.position.set(-5, -3, -6);
+        scene.add(d2);
+        const d3 = new THREE.DirectionalLight(0xffeecc, 0.4);
+        d3.position.set(2, -6, 4);
+        scene.add(d3);
+
+        // --- 材质 ---
+        const bMat = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.3, metalness: 0.1 });
+        const bondMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, metalness: 0.0 });
+        const faceMat = new THREE.MeshStandardMaterial({
+            color: 0x27ae60,
+            transparent: true,
+            opacity: 0.18,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            roughness: 0.9,
+            metalness: 0.0
+        });
+
+        // --- 分组 ---
+        const vertexGroup = new THREE.Group();
+        const edgeGroup = new THREE.Group();
+        const faceGroup = new THREE.Group();
+        scene.add(vertexGroup);
+        scene.add(edgeGroup);
+        scene.add(faceGroup);
+
+        // 面默认隐藏
+        faceGroup.visible = false;
+
+        // ============================================================
+        // 正二十面体顶点
+        //   黄金比 φ = (1+√5)/2
+        //   顶点为 (0,±1,±φ)、(±1,±φ,0)、(±φ,0,±1)
+        //   归一化后半径 = 1
+        // ============================================================
+        const phi = (1 + Math.sqrt(5)) / 2;
+
+        const rawVerts = [
+            [ 0,  1,  phi], [ 0,  1, -phi], [ 0, -1,  phi], [ 0, -1, -phi],
+            [ 1,  phi, 0], [ 1, -phi, 0], [-1,  phi, 0], [-1, -phi, 0],
+            [ phi, 0,  1], [ phi, 0, -1], [-phi, 0,  1], [-phi, 0, -1]
+        ];
+
+        // 半径缩放
+        const R = 1.4;   // 顶点到中心距离
+
+        const vertices = rawVerts.map(v => {
+            const vec = new THREE.Vector3(v[0], v[1], v[2]);
+            vec.normalize().multiplyScalar(R);
+            return vec;
+        });
+
+        // --- 放置 12 个 B 原子 ---
+        const bRadius = 0.22;
+        vertices.forEach(v => {
+            const m = new THREE.Mesh(new THREE.SphereGeometry(bRadius, 32, 20), bMat);
+            m.position.copy(v);
+            vertexGroup.add(m);
+        });
+
+        // ============================================================
+        // 30 条棱：相邻顶点距离相同
+        //   计算所有点对距离，取最小值，所有等于最小值的对即为棱
+        // ============================================================
+        let minDist = Infinity;
+        for (let i = 0; i < vertices.length; i++) {
+            for (let j = i + 1; j < vertices.length; j++) {
+                const d = vertices[i].distanceTo(vertices[j]);
+                if (d < minDist) minDist = d;
+            }
+        }
+
+        const edgePairs = [];
+        const tolerance = 1e-4;
+        for (let i = 0; i < vertices.length; i++) {
+            for (let j = i + 1; j < vertices.length; j++) {
+                const d = vertices[i].distanceTo(vertices[j]);
+                if (Math.abs(d - minDist) < tolerance) {
+                    edgePairs.push([i, j]);
+                }
+            }
+        }
+
+        // --- 画棱 ---
+        const bondRadius = 0.045;
+
+        function makeBond(start, end, radius, material) {
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            if (len < 0.001) return null;
+            const cyl = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 10), material);
+            cyl.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            return cyl;
+        }
+
+        edgePairs.forEach(([i, j]) => {
+            const cyl = makeBond(vertices[i], vertices[j], bondRadius, bondMat);
+            if (cyl) edgeGroup.add(cyl);
+        });
+
+        // ============================================================
+        // 20 个三角面（半透明）
+        //   用 IcosahedronGeometry 直接生成
+        // ============================================================
+        const icoGeo = new THREE.IcosahedronGeometry(R * 0.98, 0);
+        const icoMesh = new THREE.Mesh(icoGeo, faceMat);
+        faceGroup.add(icoMesh);
+
+        // ============================================================
+        // 控制面板
+        // ============================================================
+        const vertexToggle = document.getElementById('vertexToggle');
+        const edgeToggle = document.getElementById('edgeToggle');
+        const faceToggle = document.getElementById('faceToggle');
+
+        vertexToggle.addEventListener('change', (e) => {
+            vertexGroup.visible = e.target.checked;
+        });
+        edgeToggle.addEventListener('change', (e) => {
+            edgeGroup.visible = e.target.checked;
+        });
+        faceToggle.addEventListener('change', (e) => {
+            faceGroup.visible = e.target.checked;
+        });
+
+        // --- 初始相机适配 ---
+        fitCameraToScreen();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        function onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            fitCameraToScreen();
+        }
+
+        window.addEventListener('resize', onResize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onResize, 200);
+        });
+
+        document.addEventListener('gesturestart', (e) => e.preventDefault());
+        document.addEventListener('gesturechange', (e) => e.preventDefault());
+        document.addEventListener('gestureend', (e) => e.preventDefault());
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

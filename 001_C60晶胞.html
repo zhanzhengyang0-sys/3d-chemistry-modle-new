@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C60 面心立方晶胞 - 血红色棱框</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: white; font-family: Arial, Helvetica, sans-serif; }
+    </style>
+</head>
+<body>
+    <!-- 所有文本框已移除，纯净3D视图 -->
+
+    <!-- 引入 Three.js 核心库和轨道控制器 -->
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 (白色背景) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // --- 相机 (适应更大的晶胞) ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(32, 18, 38);
+        camera.lookAt(0, 0, 0);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器 (禁用自动旋转) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.target.set(0, 0, 0);
+        controls.rotateSpeed = 0.8;
+
+        // --- 光源配置 (增强立体感且保持黑色原子细节) ---
+        const ambientLight = new THREE.AmbientLight(0x606060);
+        scene.add(ambientLight);
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.5);
+        light1.position.set(10, 20, 20);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xe0e0ff, 1.0);
+        light2.position.set(-15, 5, -20);
+        scene.add(light2);
+
+        const light3 = new THREE.PointLight(0xffffff, 0.8);
+        light3.position.set(15, 10, 15);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xccddff, 0.6);
+        light4.position.set(0, -20, 5);
+        scene.add(light4);
+
+        const light5 = new THREE.DirectionalLight(0xffffff, 1.2);
+        light5.position.set(0, 30, 0);
+        scene.add(light5);
+
+        // 增加背面补光，使暗部细节可见
+        const backFillLight = new THREE.PointLight(0xccaa88, 0.5);
+        backFillLight.position.set(-5, -5, -8);
+        scene.add(backFillLight);
+        
+        const rimLight = new THREE.PointLight(0xffaa77, 0.45);
+        rimLight.position.set(12, 12, -12);
+        scene.add(rimLight);
+        
+        // 为了血红色棱框更加醒目，添加一个低强度的红色氛围光
+        const redFill = new THREE.PointLight(0x882222, 0.25);
+        redFill.position.set(3, 2, 4);
+        scene.add(redFill);
+
+        // ========== 1. 构建单个 C60 分子 (基于二十面体剖分法，保证精准键合) ==========
+        function createC60Molecule() {
+            const phi = (1 + Math.sqrt(5)) / 2;
+            
+            // 标准二十面体顶点 (归一化前)
+            const icoCoords = [
+                [0, 1, phi], [0, 1, -phi], [0, -1, phi], [0, -1, -phi],
+                [1, phi, 0], [1, -phi, 0], [-1, phi, 0], [-1, -phi, 0],
+                [phi, 0, 1], [phi, 0, -1], [-phi, 0, 1], [-phi, 0, -1]
+            ];
+            const normFactor = 1 / Math.sqrt(1 + phi*phi);
+            const icoVertices = icoCoords.map(c => new THREE.Vector3(c[0]*normFactor, c[1]*normFactor, c[2]*normFactor));
+
+            // 二十面体边 (距离约为1.05146)
+            const icoEdges = [];
+            for (let i = 0; i < icoVertices.length; i++) {
+                for (let j = i+1; j < icoVertices.length; j++) {
+                    const d = icoVertices[i].distanceTo(icoVertices[j]);
+                    if (Math.abs(d - 1.05146) < 0.01) {
+                        icoEdges.push([i, j]);
+                    }
+                }
+            }
+
+            // 生成C60顶点: 每条边三等分点投影到球面
+            const rawPoints = [];
+            icoEdges.forEach(edge => {
+                const v1 = icoVertices[edge[0]];
+                const v2 = icoVertices[edge[1]];
+                const p1 = new THREE.Vector3().lerpVectors(v1, v2, 1/3).normalize();
+                const p2 = new THREE.Vector3().lerpVectors(v1, v2, 2/3).normalize();
+                rawPoints.push(p1, p2);
+            });
+
+            // 去重
+            const tolerance = 0.001;
+            const uniquePoints = [];
+            rawPoints.forEach(p => {
+                let found = false;
+                for (let up of uniquePoints) {
+                    if (up.distanceTo(p) < tolerance) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) uniquePoints.push(p.clone());
+            });
+
+            // 分子缩放因子: 3.5 使分子饱满且间距拉开后依然清晰
+            const moleculeScale = 3.5;
+            const atomPositions = uniquePoints.map(p => p.clone().multiplyScalar(moleculeScale));
+
+            // 计算键连 (基于最近邻距离)
+            let minDist = Infinity;
+            for (let i = 0; i < atomPositions.length; i++) {
+                for (let j = i+1; j < atomPositions.length; j++) {
+                    const dist = atomPositions[i].distanceTo(atomPositions[j]);
+                    if (dist < minDist) minDist = dist;
+                }
+            }
+            const bondPairs = [];
+            for (let i = 0; i < atomPositions.length; i++) {
+                for (let j = i+1; j < atomPositions.length; j++) {
+                    const dist = atomPositions[i].distanceTo(atomPositions[j]);
+                    // 阈值稍宽松确保所有化学键完整
+                    if (dist < minDist * 1.12) {
+                        bondPairs.push([i, j]);
+                    }
+                }
+            }
+
+            // 原子材质: 纯黑色带微弱光泽
+            const atomMaterial = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                emissive: 0x111111,
+                roughness: 0.35,
+                metalness: 0.15,
+                emissiveIntensity: 0.08
+            });
+            const atomRadius = 0.45;
+            const atoms = new THREE.Group();
+            atomPositions.forEach(pos => {
+                const sphere = new THREE.Mesh(new THREE.SphereGeometry(atomRadius, 32, 24), atomMaterial);
+                sphere.position.copy(pos);
+                atoms.add(sphere);
+            });
+
+            // 化学键材质: 灰黑色
+            const bondMaterial = new THREE.MeshStandardMaterial({
+                color: 0x5a5a5a,
+                emissive: 0x222222,
+                roughness: 0.55,
+                metalness: 0.25
+            });
+            const bondRadius = 0.1;
+            const bonds = new THREE.Group();
+            bondPairs.forEach(pair => {
+                const i = pair[0], j = pair[1];
+                const p1 = atomPositions[i];
+                const p2 = atomPositions[j];
+                
+                const start = p1.clone();
+                const end = p2.clone();
+                const direction = new THREE.Vector3().subVectors(end, start);
+                const length = direction.length();
+                
+                const cylinder = new THREE.Mesh(
+                    new THREE.CylinderGeometry(bondRadius, bondRadius, length, 8),
+                    bondMaterial
+                );
+                
+                const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                cylinder.position.copy(midPoint);
+                cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+                
+                bonds.add(cylinder);
+            });
+
+            const moleculeGroup = new THREE.Group();
+            moleculeGroup.add(atoms);
+            moleculeGroup.add(bonds);
+            
+            return moleculeGroup;
+        }
+
+        // ========== 2. 构建面心立方晶胞 (分子间距拉开，晶胞边长增大) ==========
+        const cellSize = 14.0; // 较大的晶胞边长，分子之间有明显间隙
+        
+        const baseMolecule = createC60Molecule();
+
+        // FCC 位置: 8个角点 + 6个面心
+        const positions = [
+            // 角点
+            [-cellSize/2, -cellSize/2, -cellSize/2],
+            [ cellSize/2, -cellSize/2, -cellSize/2],
+            [-cellSize/2,  cellSize/2, -cellSize/2],
+            [ cellSize/2,  cellSize/2, -cellSize/2],
+            [-cellSize/2, -cellSize/2,  cellSize/2],
+            [ cellSize/2, -cellSize/2,  cellSize/2],
+            [-cellSize/2,  cellSize/2,  cellSize/2],
+            [ cellSize/2,  cellSize/2,  cellSize/2],
+            // 面心 (六个)
+            [ cellSize/2, 0, 0],
+            [-cellSize/2, 0, 0],
+            [0,  cellSize/2, 0],
+            [0, -cellSize/2, 0],
+            [0, 0,  cellSize/2],
+            [0, 0, -cellSize/2]
+        ];
+
+        const fccGroup = new THREE.Group();
+        positions.forEach(pos => {
+            const moleculeClone = baseMolecule.clone(true);
+            moleculeClone.position.set(pos[0], pos[1], pos[2]);
+            fccGroup.add(moleculeClone);
+        });
+
+        scene.add(fccGroup);
+
+        // ========== 3. 绘制晶胞棱框 (血红色) ==========
+        const edgeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8a0303,        // 经典血红色
+            emissive: 0x2a0000,     // 深红自发光增强血色感
+            roughness: 0.28,
+            metalness: 0.2,
+            emissiveIntensity: 0.35
+        });
+        
+        const edgeGroup = new THREE.Group();
+        const edgeRadius = 0.125;    // 棱柱稍粗，血红色更明显
+        const half = cellSize / 2;
+        
+        const corners = [
+            new THREE.Vector3(-half, -half, -half),
+            new THREE.Vector3( half, -half, -half),
+            new THREE.Vector3( half,  half, -half),
+            new THREE.Vector3(-half,  half, -half),
+            new THREE.Vector3(-half, -half,  half),
+            new THREE.Vector3( half, -half,  half),
+            new THREE.Vector3( half,  half,  half),
+            new THREE.Vector3(-half,  half,  half)
+        ];
+        
+        const edgeIndices = [
+            [0, 1], [1, 2], [2, 3], [3, 0], // 底面四边形
+            [4, 5], [5, 6], [6, 7], [7, 4], // 顶面四边形
+            [0, 4], [1, 5], [2, 6], [3, 7]  // 垂直棱
+        ];
+        
+        edgeIndices.forEach(idxPair => {
+            const start = corners[idxPair[0]];
+            const end = corners[idxPair[1]];
+            
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(edgeRadius, edgeRadius, length, 12),
+                edgeMaterial
+            );
+            
+            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            cylinder.position.copy(midPoint);
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+            
+            edgeGroup.add(cylinder);
+        });
+        
+        // 在顶点添加微小红球增强血红色调焦点
+        const cornerSphereMat = new THREE.MeshStandardMaterial({
+            color: 0x9a1f1f,
+            emissive: 0x330000,
+            roughness: 0.3,
+            metalness: 0.1
+        });
+        corners.forEach(corner => {
+            const sphereCap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), cornerSphereMat);
+            sphereCap.position.copy(corner);
+            edgeGroup.add(sphereCap);
+        });
+        
+        scene.add(edgeGroup);
+
+        // 添加极简的辅助地面网格线 (半透灰，帮助定位空间，不干扰视觉)
+        const gridHelper = new THREE.GridHelper(28, 20, 0xcccccc, 0xe0e0e0);
+        gridHelper.position.y = -cellSize/2 - 1.2;
+        gridHelper.material.transparent = true;
+        gridHelper.material.opacity = 0.25;
+        scene.add(gridHelper);
+        
+        // 添加极细的轴线指示 (轻量辅助)
+        const axesHelper = new THREE.AxesHelper(10);
+        axesHelper.material.transparent = true;
+        axesHelper.material.opacity = 0.12;
+        scene.add(axesHelper);
+
+        // 更新相机控制目标点
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        // ========== 动画循环 ==========
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // 窗口自适应
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        console.log('C60 FCC晶胞 (血红色棱框) 加载完成，所有文本框已移除');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

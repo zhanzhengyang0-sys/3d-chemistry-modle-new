@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>三堆垛 · 原子模型</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #eef0f3; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; }
+        
+        /* 底部开关控制栏 - 调小尺寸，厚度变薄 */
+        .control-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            display: flex;
+            gap: 16px;
+            background: rgba(10, 15, 22, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 6px 20px;
+            border-radius: 40px;
+            border: 1px solid #7a8a9e;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            color: white;
+            align-items: center;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .toggle-item span { 
+            color: #f0f4ff; 
+            white-space: nowrap;
+            text-shadow: 0 1px 2px black;
+            font-size: 12px;
+        }
+        .toggle-switch label {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+            margin: 0;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #2c3545;
+            transition: .2s cubic-bezier(0.4, 0.0, 0.2, 1);
+            border-radius: 34px;
+            border: 1px solid #8e9eb0;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 2px;
+            bottom: 1px;
+            background-color: #f4f8ff;
+            transition: .2s cubic-bezier(0.4, 0.0, 0.2, 1);
+            border-radius: 50%;
+            box-shadow: 0 1px 4px #00000080;
+        }
+        input:checked + .slider {
+            background-color: #1f5a9e;
+            border-color: #b0d2ff;
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+            background-color: #ffffff;
+        }
+        .status-badge {
+            min-width: 36px;
+            color: #ffffff;
+            font-weight: 600;
+            text-shadow: 0 1px 2px #000000b0;
+            text-align: center;
+            background: #1f2a36;
+            padding: 2px 8px;
+            border-radius: 24px;
+            font-size: 11px;
+        }
+    </style>
+    </head>
+<body>
+    <!-- 底部简洁开关控制栏 -->
+    <div class="control-bar">
+        <div class="toggle-item">
+            <span>⚙️ 侧翼结构</span>
+            <div class="toggle-switch">
+                <label>
+                    <input type="checkbox" id="sideToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <span class="status-badge" id="toggleStatus">显示</span>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef0f3);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // --- 核心几何参数 (调小整体尺寸) ---
+        const baseSide = 1.2;          // 缩小基础边长
+        const side = baseSide * 1.25 * 1.2;   // 1.8
+        const layerHeight = 1.6 * 1.2;        // 1.92
+
+        // --- 定义菱形两个边方向 (120°) ---
+        const angle1 = 0;
+        const angle2 = 2 * Math.PI / 3;                     // 120°
+        
+        const dir1 = new THREE.Vector3(Math.cos(angle1), 0, Math.sin(angle1)).multiplyScalar(side);
+        const dir2 = new THREE.Vector3(Math.cos(angle2), 0, Math.sin(angle2)).multiplyScalar(side);
+        
+        // --- 构建堆垛函数 ---
+        function buildStackWith120CornerAt(cornerX, cornerY, cornerZ, rotationY) {
+            const rotate = (v) => v.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
+            
+            const v0_world = new THREE.Vector3(cornerX, cornerY, cornerZ);
+            const v1_world = v0_world.clone().add(rotate(dir1));
+            const v2_world = v0_world.clone().add(rotate(dir1.clone().add(dir2)));
+            const v3_world = v0_world.clone().add(rotate(dir2));
+            
+            const lowPos = [v0_world, v1_world, v2_world, v3_world];
+            const highPos = lowPos.map(p => new THREE.Vector3(p.x, cornerY + 2 * layerHeight, p.z));
+            
+            const triV0 = highPos[0];
+            const triV1 = highPos[1];
+            const triV2 = highPos[2];
+            
+            const triCenterX = (triV0.x + triV1.x + triV2.x) / 3;
+            const triCenterZ = (triV0.z + triV1.z + triV2.z) / 3;
+            
+            const midPos = new THREE.Vector3(triCenterX, cornerY + layerHeight, triCenterZ);
+            
+            return {
+                low: lowPos,
+                mid: midPos,
+                high: highPos,
+                all: [...lowPos, midPos, ...highPos]
+            };
+        }
+
+        // --- 生成三个堆垛 ---
+        const stackA = buildStackWith120CornerAt(0, 0, 0, 0);
+        const stackB = buildStackWith120CornerAt(0, 0, 0, 2 * Math.PI / 3);
+        const stackC = buildStackWith120CornerAt(0, 0, 0, 4 * Math.PI / 3);
+        
+        // --- 计算中心点 ---
+        let sumY_A = 0;
+        stackA.all.forEach(p => { sumY_A += p.y; });
+        const centerA_Y = sumY_A / stackA.all.length;
+        const centerA = new THREE.Vector3(0, centerA_Y, 0); 
+        
+        const allPositions = [...stackA.all, ...stackB.all, ...stackC.all];
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        allPositions.forEach(p => {
+            minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+            minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+        });
+        const centerFull = new THREE.Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+
+        // --- 正确计算原子位置和重叠 ---
+        // 创建坐标键集合
+        function getPositionKey(pos) {
+            return `${Math.round(pos.x * 100)},${Math.round(pos.y * 100)},${Math.round(pos.z * 100)}`;
+        }
+
+        // 收集所有位置
+        const allPositionsWithKeys = [
+            ...stackA.all.map(p => ({ pos: p, key: getPositionKey(p), stack: 'A' })),
+            ...stackB.all.map(p => ({ pos: p, key: getPositionKey(p), stack: 'B' })),
+            ...stackC.all.map(p => ({ pos: p, key: getPositionKey(p), stack: 'C' }))
+        ];
+
+        // 找出唯一位置
+        const uniquePositions = new Map();
+        allPositionsWithKeys.forEach(item => {
+            if (!uniquePositions.has(item.key)) {
+                uniquePositions.set(item.key, {
+                    pos: item.pos,
+                    stacks: [item.stack]
+                });
+            } else {
+                uniquePositions.get(item.key).stacks.push(item.stack);
+            }
+        });
+
+        // 分离中央堆垛A的原子和侧翼原子
+        const groupA_atoms = new THREE.Group();
+        const groupB_atoms = new THREE.Group();
+        const groupC_atoms = new THREE.Group();
+        
+        const sphereGeo = new THREE.SphereGeometry(0.52, 32, 20);  // 缩小原子半径
+        
+        // 存储所有原子mesh的数组
+        const allAtomMeshes = [];
+
+        // 定义颜色
+        const COLOR_BLACK = 0x1a1a2e;
+        const COLOR_RED = 0xb53b3b;
+        
+        // 创建原子函数
+        function createAtom(position, group, stack归属) {
+            const material = new THREE.MeshStandardMaterial({ 
+                color: COLOR_BLACK, 
+                roughness: 0.24, 
+                metalness: 0.55,
+                emissive: 0x0a0a18,
+                emissiveIntensity: 0.2
+            });
+            const sphere = new THREE.Mesh(sphereGeo, material);
+            sphere.position.copy(position);
+            
+            sphere.userData = {
+                isRed: false,
+                id: allAtomMeshes.length,
+                stacks: stack归属
+            };
+            
+            group.add(sphere);
+            allAtomMeshes.push(sphere);
+            return sphere;
+        }
+
+        // 根据唯一位置创建原子
+        uniquePositions.forEach((value, key) => {
+            const pos = value.pos;
+            const stacks = value.stacks;
+            
+            if (stacks.includes('A')) {
+                createAtom(pos, groupA_atoms, stacks);
+            } else {
+                createAtom(pos, groupB_atoms, stacks);
+            }
+        });
+        
+        // 添加到场景
+        scene.add(groupA_atoms);
+        scene.add(groupB_atoms);
+        scene.add(groupC_atoms);
+
+        // --- 绘制棱边 (调细) ---
+        const edgeMat = new THREE.MeshStandardMaterial({ color: 0x3a3f50, emissive: 0x101018, roughness: 0.45, metalness: 0.3 });
+        const thickness = 0.08;  // 更细的棱边
+        
+        function drawLine(p1, p2, group) {
+            const start = new THREE.Vector3(p1.x, p1.y, p1.z);
+            const end = new THREE.Vector3(p2.x, p2.y, p2.z);
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            if (len < 0.2) return;
+            const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            const cyl = new THREE.Mesh(
+                new THREE.CylinderGeometry(thickness, thickness, len, 6),
+                edgeMat
+            );
+            cyl.position.copy(mid);
+            cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+            group.add(cyl);
+        }
+        
+        function addEdgesForStack(stack, group) {
+            const low = stack.low;
+            const high = stack.high;
+            
+            drawLine(low[0], low[1], group);
+            drawLine(low[1], low[2], group);
+            drawLine(low[2], low[3], group);
+            drawLine(low[3], low[0], group);
+            
+            drawLine(high[0], high[1], group);
+            drawLine(high[1], high[2], group);
+            drawLine(high[2], high[3], group);
+            drawLine(high[3], high[0], group);
+            
+            for (let i = 0; i < 4; i++) {
+                drawLine(low[i], high[i], group);
+            }
+        }
+        
+        const groupA_edges = new THREE.Group();
+        const groupB_edges = new THREE.Group();
+        const groupC_edges = new THREE.Group();
+        
+        addEdgesForStack(stackA, groupA_edges);
+        addEdgesForStack(stackB, groupB_edges);
+        addEdgesForStack(stackC, groupC_edges);
+        
+        scene.add(groupA_edges);
+        scene.add(groupB_edges);
+        scene.add(groupC_edges);
+
+        // --- 光照 ---
+        const ambient = new THREE.AmbientLight(0x7a8aa0);
+        scene.add(ambient);
+        
+        const light1 = new THREE.DirectionalLight(0xfff8f0, 1.9);
+        light1.position.set(7, 14, 9);
+        scene.add(light1);
+        
+        const light2 = new THREE.DirectionalLight(0xe0ecff, 1.7);
+        light2.position.set(-8, -2, -10);
+        scene.add(light2);
+        
+        const light3 = new THREE.PointLight(0xaaccff, 1.3);
+        light3.position.set(5, 5, 10);
+        scene.add(light3);
+        
+        const light4 = new THREE.PointLight(0xffccaa, 1.0);
+        light4.position.set(-6, 6, -8);
+        scene.add(light4);
+
+        const fillLight = new THREE.DirectionalLight(0xc0d0f0, 0.6);
+        fillLight.position.set(2, 5, 5);
+        scene.add(fillLight);
+
+        // --- 控制器 (相机位置调远一些，使图形在视野中更小) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 1.1;
+        controls.target.copy(centerFull);
+        controls.maxPolarAngle = Math.PI;
+        
+        // 相机位置拉远，使图形初始显示更小
+        camera.position.set(centerFull.x + 6.5, centerFull.y + 4, centerFull.z + 6.5);
+        camera.lookAt(centerFull);
+        controls.update();
+
+        // --- 界面元素 ---
+        const sideToggle = document.getElementById('sideToggle');
+        const toggleStatus = document.getElementById('toggleStatus');
+        
+        sideToggle.addEventListener('change', (e) => {
+            const visible = e.target.checked;
+            groupB_atoms.visible = visible;
+            groupB_edges.visible = visible;
+            groupC_edges.visible = visible;
+            toggleStatus.innerText = visible ? '显示' : '隐藏';
+            
+            if (visible) {
+                controls.target.copy(centerFull);
+            } else {
+                controls.target.copy(centerA);
+            }
+            controls.update();
+        });
+
+        sideToggle.checked = true;
+        toggleStatus.innerText = '显示';
+        groupB_atoms.visible = true;
+        groupB_edges.visible = true;
+        groupC_edges.visible = true;
+
+        // --- 点击变色功能 ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onClick(event) {
+            mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersects = raycaster.intersectObjects(allAtomMeshes);
+            
+            if (intersects.length > 0) {
+                const hitMesh = intersects[0].object;
+                
+                if (hitMesh.userData.isRed) {
+                    hitMesh.material.color.setHex(COLOR_BLACK);
+                    hitMesh.material.emissive.setHex(0x0a0a18);
+                    hitMesh.userData.isRed = false;
+                } else {
+                    hitMesh.material.color.setHex(COLOR_RED);
+                    hitMesh.material.emissive.setHex(0x3a1010);
+                    hitMesh.userData.isRed = true;
+                }
+                hitMesh.material.needsUpdate = true;
+            }
+        }
+
+        renderer.domElement.addEventListener('click', onClick);
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                onClick({ clientX: touch.clientX, clientY: touch.clientY });
+            }
+        }, { passive: false });
+
+        // 键盘重置颜色
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                allAtomMeshes.forEach(mesh => {
+                    mesh.material.color.setHex(COLOR_BLACK);
+                    mesh.material.emissive.setHex(0x0a0a18);
+                    mesh.userData.isRed = false;
+                });
+            }
+        });
+
+        // --- 动画 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

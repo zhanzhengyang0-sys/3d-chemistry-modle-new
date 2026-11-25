@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>乙酸 (CH₃COOH) - C-O-H键角120° - 白底灰键</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, Helvetica, sans-serif; }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 30px;
+            padding: 8px 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #controls label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+        input {
+            width: 220px;
+            cursor: pointer;
+        }
+        #angle {
+            background: #f0f0f0;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #ffaa66;
+        }
+        @media (max-width: 600px) {
+            #controls { flex-direction: column; gap: 8px; width: 80%; }
+            input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label>🔁 甲基旋转 <input type="range" id="slider" min="0" max="360" step="1" value="0"></label>
+        <span id="angle">0°</span>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 4, 7);
+        camera.lookAt(0, 0, 0.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // --- 控制器 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0.8);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0x666666));
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+        mainLight.position.set(2, 5, 3);
+        scene.add(mainLight);
+        const fillLight = new THREE.PointLight(0xffffff, 0.5);
+        fillLight.position.set(-2, 1, 4);
+        scene.add(fillLight);
+        const backLight = new THREE.PointLight(0xffffff, 0.4);
+        backLight.position.set(0, 2, -3);
+        scene.add(backLight);
+
+        // --- 原子参数 ---
+        const rC = 0.5;
+        const rO = 0.4;
+        const rH = 0.3;
+        
+        const carbonMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.2 });
+        const hMat = new THREE.MeshStandardMaterial({ color: 0x3366cc, roughness: 0.2 });
+        const oMat = new THREE.MeshStandardMaterial({ color: 0xff5500, roughness: 0.25 });
+        const bondMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3 });
+
+        // --- 原子位置 ---
+        const cMethyl = new THREE.Vector3(0, 0, 0);
+        const cCarboxy = new THREE.Vector3(0, 0, 1.6);
+
+        // 碳原子
+        const carbon1 = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 64), carbonMat);
+        carbon1.position.copy(cMethyl);
+        scene.add(carbon1);
+        const carbon2 = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 64), carbonMat);
+        carbon2.position.copy(cCarboxy);
+        scene.add(carbon2);
+
+        // C-C 单键
+        const ccBond = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.6, 12), bondMat);
+        ccBond.position.set(0, 0, 0.8);
+        ccBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+        scene.add(ccBond);
+
+        // ==================== 羧基 ====================
+        const lenCO = 1.25;
+        const lenCOH = 1.36;
+        const lenOH = 0.98;
+        
+        function rotY(vec, deg) {
+            const rad = deg * Math.PI / 180;
+            const c = Math.cos(rad);
+            const s = Math.sin(rad);
+            return new THREE.Vector3(vec.x * c + vec.z * s, vec.y, -vec.x * s + vec.z * c);
+        }
+        
+        const toC1 = new THREE.Vector3(0, 0, -1);
+        const toO_carbonyl = rotY(toC1, 120);
+        const toO_hydroxy = rotY(toC1, -120);
+        
+        const oCarbonylPos = cCarboxy.clone().add(toO_carbonyl.clone().multiplyScalar(lenCO));
+        const oHydroxyPos = cCarboxy.clone().add(toO_hydroxy.clone().multiplyScalar(lenCOH));
+        
+        // C-O-H 键角 = 120°
+        const OtoC = cCarboxy.clone().sub(oHydroxyPos);
+        OtoC.y = 0;
+        OtoC.normalize();
+        
+        const angleRad = 120 * Math.PI / 180;
+        const OtoC_angle = Math.atan2(OtoC.z, OtoC.x);
+        const ohAngle1 = OtoC_angle + angleRad;
+        const ohAngle2 = OtoC_angle - angleRad;
+        
+        const ohDir1 = new THREE.Vector3(Math.cos(ohAngle1), 0, Math.sin(ohAngle1));
+        const ohDir2 = new THREE.Vector3(Math.cos(ohAngle2), 0, Math.sin(ohAngle2));
+        
+        const toCarbonyl = oCarbonylPos.clone().sub(oHydroxyPos);
+        toCarbonyl.y = 0;
+        toCarbonyl.normalize();
+        
+        const ohDir = (ohDir1.dot(toCarbonyl) > ohDir2.dot(toCarbonyl)) ? ohDir1 : ohDir2;
+        const hHydroxyPos = oHydroxyPos.clone().add(ohDir.clone().multiplyScalar(lenOH));
+        
+        // 添加氧原子和氢原子
+        const oxygenCarbonyl = new THREE.Mesh(new THREE.SphereGeometry(rO, 64, 64), oMat);
+        oxygenCarbonyl.position.copy(oCarbonylPos);
+        scene.add(oxygenCarbonyl);
+        
+        const oxygenHydroxy = new THREE.Mesh(new THREE.SphereGeometry(rO, 64, 64), oMat);
+        oxygenHydroxy.position.copy(oHydroxyPos);
+        scene.add(oxygenHydroxy);
+        
+        const hydrogenHydroxy = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 48), hMat);
+        hydrogenHydroxy.position.copy(hHydroxyPos);
+        scene.add(hydrogenHydroxy);
+        
+        // --- 化学键 ---
+        const axisCO = toO_carbonyl.clone().normalize();
+        let perp = new THREE.Vector3(0, 1, 0).cross(axisCO);
+        if (perp.length() < 0.1) perp = new THREE.Vector3(1, 0, 0).cross(axisCO);
+        perp.normalize();
+        const off = 0.12;
+        
+        const bondCO1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, lenCO, 12), bondMat);
+        bondCO1.position.copy(cCarboxy.clone().add(toO_carbonyl.clone().multiplyScalar(lenCO * 0.5)).add(perp.clone().multiplyScalar(off)));
+        bondCO1.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axisCO);
+        scene.add(bondCO1);
+        
+        const bondCO2 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, lenCO, 12), bondMat);
+        bondCO2.position.copy(cCarboxy.clone().add(toO_carbonyl.clone().multiplyScalar(lenCO * 0.5)).sub(perp.clone().multiplyScalar(off)));
+        bondCO2.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axisCO);
+        scene.add(bondCO2);
+        
+        const bondCOH = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, lenCOH, 12), bondMat);
+        bondCOH.position.copy(cCarboxy.clone().add(toO_hydroxy.clone().multiplyScalar(lenCOH * 0.5)));
+        bondCOH.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), toO_hydroxy);
+        scene.add(bondCOH);
+        
+        const bondOH = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, lenOH, 12), bondMat);
+        bondOH.position.copy(oHydroxyPos.clone().add(ohDir.clone().multiplyScalar(lenOH * 0.5)));
+        bondOH.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ohDir);
+        scene.add(bondOH);
+
+        // ==================== 甲基 ====================
+        // 球面距离 = 0.6，所以球心距 = rC + rH + 0.6 = 0.5 + 0.3 + 0.6 = 1.4
+        const methylGroup = new THREE.Group();
+        methylGroup.position.copy(cMethyl);
+        
+        const chLen = 1.4;  // 球心距
+        const cos109 = -1/3;
+        const sin109 = Math.sqrt(1 - cos109 * cos109);
+        
+        [0, 120, 240].forEach(angle => {
+            const rad = angle * Math.PI / 180;
+            const x = sin109 * Math.cos(rad) * chLen;
+            const y = sin109 * Math.sin(rad) * chLen;
+            const z = cos109 * chLen;
+            const hPos = new THREE.Vector3(x, y, z);
+            
+            const hAtom = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 48), hMat);
+            hAtom.position.copy(hPos);
+            methylGroup.add(hAtom);
+            
+            const hBond = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, chLen, 8), bondMat);
+            hBond.position.copy(hPos.clone().multiplyScalar(0.5));
+            hBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), hPos.clone().normalize());
+            methylGroup.add(hBond);
+        });
+        scene.add(methylGroup);
+        
+        // 验证
+        const OtoC_check = cCarboxy.clone().sub(oHydroxyPos);
+        OtoC_check.y = 0;
+        OtoC_check.normalize();
+        const ohDir_check = hHydroxyPos.clone().sub(oHydroxyPos);
+        ohDir_check.y = 0;
+        ohDir_check.normalize();
+        const actualAngle = Math.acos(Math.min(1, Math.max(-1, OtoC_check.dot(ohDir_check)))) * 180 / Math.PI;
+        console.log(`C-O-H 键角 = ${actualAngle.toFixed(1)}° (目标 120°)`);
+        console.log(`甲基C-H球心距 = ${chLen}, 球面距 = ${chLen - rC - rH} = 0.6`);
+        
+        // 滑块控制
+        const slider = document.getElementById('slider');
+        const angleSpan = document.getElementById('angle');
+        slider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            angleSpan.textContent = val + "°";
+            methylGroup.rotation.z = val * Math.PI / 180;
+        });
+        
+        // 动画
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

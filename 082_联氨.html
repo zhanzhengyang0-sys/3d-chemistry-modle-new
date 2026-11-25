@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+    <title>肼 N₂H₄ · 3D 球棍模型（gauche 构象）</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #ffffff;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #legend {
+            position: absolute;
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            padding: 6px 18px;
+            border-radius: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            font-size: 12px;
+            color: #444;
+            z-index: 100;
+            display: flex;
+            gap: 16px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        @media (max-width: 480px) {
+            #legend {
+                font-size: 11px;
+                padding: 5px 14px;
+                gap: 12px;
+            }
+            .legend-dot {
+                width: 10px;
+                height: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#e74c3c;"></div>N</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2980b9;"></div>H</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#9b59b6; opacity:0.6;"></div>孤对电子</div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        // --- 控制器（触屏适配）---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.rotateSpeed = 0.9;
+        controls.zoomSpeed = 0.9;
+        controls.panSpeed = 0.9;
+        controls.target.set(0, 0, 0);
+
+        // 根据屏幕方向设置相机距离和位置，保证模型完整可见
+        function fitCameraToScreen() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const aspect = w / h;
+
+            // 竖屏时相机稍远一点，横屏时稍近一点
+            let dist;
+            if (aspect < 1) {
+                // 竖屏
+                dist = 6.2;
+            } else if (aspect < 1.6) {
+                // 近方形
+                dist = 5.6;
+            } else {
+                // 横屏
+                dist = 5.0;
+            }
+
+            // 从斜上方看向原点
+            const dir = new THREE.Vector3(1.0, 0.75, 1.3).normalize();
+            camera.position.copy(dir.multiplyScalar(dist));
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            controls.update();
+        }
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        const d1 = new THREE.DirectionalLight(0xffffff, 0.9);
+        d1.position.set(5, 8, 6);
+        scene.add(d1);
+        const d2 = new THREE.DirectionalLight(0xccddff, 0.5);
+        d2.position.set(-5, -3, -6);
+        scene.add(d2);
+        const d3 = new THREE.DirectionalLight(0xffeecc, 0.4);
+        d3.position.set(2, -6, 4);
+        scene.add(d3);
+
+        // --- 材质 ---
+        const nMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.3, metalness: 0.1 });
+        const hMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, roughness: 0.4, metalness: 0.05 });
+        const bondMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.6, metalness: 0.0, transparent: true, opacity: 0.98 });
+        const lonePairMat = new THREE.MeshStandardMaterial({
+            color: 0x9b59b6,
+            roughness: 0.4,
+            metalness: 0.0,
+            transparent: true,
+            opacity: 0.55,
+            emissive: 0x4a235a,
+            emissiveIntensity: 0.25
+        });
+
+        // --- 分组 ---
+        const atomGroup = new THREE.Group();
+        const bondGroup = new THREE.Group();
+        const lonePairGroup = new THREE.Group();
+        scene.add(atomGroup);
+        scene.add(bondGroup);
+        scene.add(lonePairGroup);
+
+        // --- 辅助函数 ---
+        function addSphere(group, pos, radius, material) {
+            const m = new THREE.Mesh(new THREE.SphereGeometry(radius, 28, 18), material);
+            m.position.copy(pos);
+            group.add(m);
+            return m;
+        }
+
+        function makeBond(start, end, radius, material) {
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            if (len < 0.001) return null;
+            const cyl = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 10), material);
+            cyl.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            bondGroup.add(cyl);
+            return cyl;
+        }
+
+        // ============================================================
+        // 水滴形孤对电子（保持原版）
+        // ============================================================
+        function makeWaterDropGeometry(length, maxRadius, segments = 400) {
+            const ctrl = [
+                [0.00, 0.000],
+                [0.06, 0.015],
+                [0.14, 0.05],
+                [0.26, 0.11],
+                [0.40, 0.20],
+                [0.55, 0.31],
+                [0.70, 0.43],
+                [0.83, 0.54],
+                [0.93, 0.63],
+                [0.99, 0.71],
+                [1.00, 0.78],
+                [0.99, 0.83],
+                [0.95, 0.87],
+                [0.88, 0.905],
+                [0.78, 0.935],
+                [0.64, 0.958],
+                [0.48, 0.975],
+                [0.30, 0.988],
+                [0.14, 0.996],
+                [0.00, 1.000]
+            ];
+
+            const points3 = ctrl.map(p => new THREE.Vector3(p[0] * maxRadius, p[1] * length, 0));
+            const curve = new THREE.CatmullRomCurve3(points3, false, 'catmullrom', 0.5);
+
+            const raw = [];
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const p = curve.getPoint(t);
+                raw.push(new THREE.Vector2(Math.max(p.x, 0.0001), p.y));
+            }
+
+            const pts = raw.map((p, i) => {
+                if (i < 2 || i > raw.length - 3) return p.clone();
+                const r = (
+                    raw[i - 2].x + raw[i - 1].x + raw[i].x + raw[i + 1].x + raw[i + 2].x
+                ) / 5;
+                return new THREE.Vector2(Math.max(r, 0.0001), p.y);
+            });
+
+            pts[0].x = 0.0001;
+            pts[pts.length - 1].x = 0.0001;
+
+            const geo = new THREE.LatheGeometry(pts, 128);
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        function makeLonePairDrop(nPos, dir, nRadius, length, maxRadius, material) {
+            const geo = makeWaterDropGeometry(length, maxRadius, 400);
+            const mesh = new THREE.Mesh(geo, material);
+
+            const tipOffset = Math.max(nRadius - 0.05, 0);
+            const tipPos = nPos.clone().add(dir.clone().normalize().multiplyScalar(tipOffset));
+
+            mesh.position.copy(tipPos);
+            mesh.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                dir.clone().normalize()
+            );
+            lonePairGroup.add(mesh);
+            return mesh;
+        }
+
+        // ============================================================
+        // 肼 N₂H₄ · gauche 构象（两个孤对电子更靠近，约 60°）
+        // ============================================================
+
+        const nRadius   = 0.30;
+        const hRadius   = 0.18;
+        const bondRadius = 0.055;
+
+        const nHalf = 0.55;
+        const n1 = new THREE.Vector3(0,  nHalf, 0);
+        const n2 = new THREE.Vector3(0, -nHalf, 0);
+
+        const L_NH = 0.78;
+
+        const sinT = Math.sqrt(8) / 3;
+        const yComp = 1 / 3;
+
+        const phi1 = 0;
+        const phi2 = 2 * Math.PI / 3;
+        const phi3 = 4 * Math.PI / 3;
+
+        const n1_dirH1 = new THREE.Vector3(sinT * Math.cos(phi1), yComp, sinT * Math.sin(phi1));
+        const n1_dirH2 = new THREE.Vector3(sinT * Math.cos(phi2), yComp, sinT * Math.sin(phi2));
+        const n1_dirLP = new THREE.Vector3(sinT * Math.cos(phi3), yComp, sinT * Math.sin(phi3));
+
+        const yComp2 = -1 / 3;
+        const phiLP2 = phi3 + Math.PI / 3;
+        const phiH2a = phiLP2 + 2 * Math.PI / 3;
+        const phiH2b = phiLP2 + 4 * Math.PI / 3;
+
+        const n2_dirLP = new THREE.Vector3(sinT * Math.cos(phiLP2), yComp2, sinT * Math.sin(phiLP2));
+        const n2_dirH1 = new THREE.Vector3(sinT * Math.cos(phiH2a), yComp2, sinT * Math.sin(phiH2a));
+        const n2_dirH2 = new THREE.Vector3(sinT * Math.cos(phiH2b), yComp2, sinT * Math.sin(phiH2b));
+
+        const h1a = n1.clone().add(n1_dirH1.clone().multiplyScalar(L_NH));
+        const h1b = n1.clone().add(n1_dirH2.clone().multiplyScalar(L_NH));
+        const h2a = n2.clone().add(n2_dirH1.clone().multiplyScalar(L_NH));
+        const h2b = n2.clone().add(n2_dirH2.clone().multiplyScalar(L_NH));
+
+        addSphere(atomGroup, n1, nRadius, nMat);
+        addSphere(atomGroup, n2, nRadius, nMat);
+        addSphere(atomGroup, h1a, hRadius, hMat);
+        addSphere(atomGroup, h1b, hRadius, hMat);
+        addSphere(atomGroup, h2a, hRadius, hMat);
+        addSphere(atomGroup, h2b, hRadius, hMat);
+
+        // --- 水滴形孤对电子 ---
+        const lpLength = 0.9;
+        const lpMaxR   = 0.24;
+
+        makeLonePairDrop(n1, n1_dirLP, nRadius, lpLength, lpMaxR, lonePairMat);
+        makeLonePairDrop(n2, n2_dirLP, nRadius, lpLength, lpMaxR, lonePairMat);
+
+        // --- 连接键 ---
+        makeBond(n1, n2, bondRadius, bondMat);
+        makeBond(n1, h1a, bondRadius, bondMat);
+        makeBond(n1, h1b, bondRadius, bondMat);
+        makeBond(n2, h2a, bondRadius, bondMat);
+        makeBond(n2, h2b, bondRadius, bondMat);
+
+        // --- 初始相机适配 ---
+        fitCameraToScreen();
+
+        // --- 动画 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 窗口 / 屏幕方向自适应 ---
+        function onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            fitCameraToScreen();
+        }
+
+        window.addEventListener('resize', onResize);
+        window.addEventListener('orientationchange', () => {
+            // 延迟一点，等浏览器完成方向切换后的尺寸更新
+            setTimeout(onResize, 200);
+        });
+
+        // 阻止 iOS 双指缩放页面
+        document.addEventListener('gesturestart', (e) => e.preventDefault());
+        document.addEventListener('gesturechange', (e) => e.preventDefault());
+        document.addEventListener('gestureend', (e) => e.preventDefault());
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

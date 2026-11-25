@@ -1,0 +1,3642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>水溶液平衡曲线</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --line:#e6eaf0; --ink:#1b2430; --muted:#6b7787;
+    --accent:#2563eb; --accent-soft:#e8efff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:15px/1.55 "Microsoft YaHei","PingFang SC","Noto Sans CJK SC",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{display:grid;grid-template-columns:320px 1fr;height:100vh;height:100dvh}
+
+  /* ---------- 左栏 ---------- */
+  .panel{
+    background:#fbfcfe;border-right:1px solid var(--line);
+    padding:14px 12px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;
+  }
+  .brand{font-size:16.5px;font-weight:700;letter-spacing:.01em;padding:0 2px 2px}
+  .brand small{display:block;font-size:11px;font-weight:400;color:#9aa6b6;margin-top:1px;letter-spacing:0}
+
+  .sec{background:#fff;border:1px solid #eaeef4;border-radius:11px;padding:10px 11px;
+    display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px rgba(16,24,40,.02)}
+  .sec-t{font-size:11.5px;font-weight:700;color:#5b6b80;letter-spacing:.09em}
+
+  select,input[type=number]{
+    width:100%;min-height:42px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;
+    background:#fff;color:var(--ink);font:inherit;font-size:14px;
+  }
+  select:focus,input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  select:disabled{opacity:.45;background:#f8fafc}
+  .row{display:flex;gap:6px;align-items:center}
+  .row > *{min-width:0}
+  .btn{
+    min-height:33px;padding:0 11px;border:1px solid var(--line);border-radius:7px;
+    background:#fff;color:var(--ink);font:inherit;font-size:14px;cursor:pointer;
+    transition:.15s;white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.sm{min-height:26px;padding:0 9px;font-size:11.5px;border-radius:6px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .ax{display:flex;align-items:center;gap:6px}
+  .axl{width:22px;flex:none;font-size:11.5px;font-weight:700;color:#7c8a9c;text-align:center}
+  .swap{width:31px;min-width:31px;padding:0;font-size:14px;min-height:31px}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;min-height:38px}
+  .chk input{width:19px;height:19px;accent-color:var(--accent);flex:none}
+  .chk.mini{font-size:11.5px;gap:4px;white-space:nowrap;min-height:0}
+  .chk-row{display:flex;gap:12px;flex-wrap:wrap}
+  input[type=range]{-webkit-appearance:none;width:100%;height:34px;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;background:#dfe5ee}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;
+    border:2px solid var(--accent);margin-top:-6.5px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15)
+  }
+  .hint{font-size:10.8px;color:#8b95a3;line-height:1.55}
+  .hidden{display:none!important}
+  .group{display:flex;flex-direction:column;gap:5px}
+  .group > label{font-size:11px;color:#8b95a3;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 6px;border-radius:999px;
+    background:var(--accent-soft);color:#1e40af;font-size:11.5px;max-width:100%}
+  .chip i{width:7px;height:7px;border-radius:50%;flex:none}
+  .chip button{all:unset;cursor:pointer;width:15px;height:15px;line-height:13px;text-align:center;
+    border-radius:50%;color:#41527a;font-size:12px}
+  .chip button:hover{background:#d3e0ff}
+
+  /* ---------- 右侧 ---------- */
+  .stage{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:8px 10px 6px;
+    box-shadow:0 1px 2px rgba(16,24,40,.03)}
+  .chartbar{display:flex;align-items:center;gap:6px;padding:1px 2px 6px}
+  .chartbar .spacer{flex:1}
+  .chart{position:relative;width:100%}
+  .chart svg{display:block;width:100%;height:auto;touch-action:manipulation}
+  .tip{
+    position:absolute;pointer-events:none;background:rgba(23,32,44,.95);color:#fff;
+    padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.7;
+    max-width:340px;opacity:0;transition:opacity .12s;z-index:9;
+  }
+  .tip.on{opacity:1}
+  .tip .k{color:#9fb3d1;margin-right:6px}
+  .tip .col{display:grid;grid-template-columns:auto auto;gap:0 18px}
+  .foot{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .foot .spacer{flex:1}
+  .cards{display:flex;flex-direction:column;gap:7px}
+  .cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:7px}
+  .cardx{background:#fff;border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+  .cardx .t{font-size:11px;color:#6b7787;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cardx .v{font-size:12.5px;font-weight:600;color:#1b2430}
+  .order{grid-column:1/-1;background:#fff;border:1px solid var(--line);border-radius:9px;
+    padding:8px 11px;font-size:13px;color:#334155;line-height:1.95}
+  .order code{font-family:"Cambria Math","Times New Roman",serif;font-size:14px}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;height:auto;min-height:100dvh}
+    .panel{border-right:none;border-bottom:1px solid var(--line);overflow:visible;
+      padding:12px 12px calc(14px + env(safe-area-inset-bottom))}
+    .stage{padding:10px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+    .sec{padding:12px}
+  }
+  @media (max-width:520px){
+    body{font-size:15.5px}
+    .panel{padding:10px 10px calc(12px + env(safe-area-inset-bottom))}
+    select,input[type=number],.btn{min-height:46px;font-size:15px}
+    .chk{min-height:44px;font-size:14.5px}
+    .chk input{width:22px;height:22px}
+    .btn.sm{min-height:38px;font-size:13.5px}
+    .sec-t{font-size:12px}
+    .stage{padding:8px}
+  }
+  /* 触屏：去掉 300ms 延迟与双击缩放干扰 */
+  @media (hover:none){
+    .btn,select,input{touch-action:manipulation}
+    .btn:active{background:#eef2ff}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <div class="brand">水溶液平衡曲线
+      <small>场景 · 轴 · 定量作图 · v4.5</small>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">快速开始</div>
+      <select id="presetSel"></select>
+      <div class="hint">选一个示例，自动配好场景与参数；选完会自动复位，它只是一个快捷入口。</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">场景与参数</div>
+      <select id="scenario">
+        <option value="aq">① 分布曲线 · δ 随 pH</option>
+        <option value="dil">② 稀释 · pH 随稀释倍数 n</option>
+        <option value="types">③ 稀释 · 各微粒浓度随总浓度（九类）</option>
+        <option value="mix">④ 混合体系 · 各微粒浓度随总浓度</option>
+        <option value="tit">⑤ 滴定 · pH 随滴定体积 V</option>
+        <option value="feed">⑥ 投料比 · pH 随酸/碱物质的量比</option>
+        <option value="precip">⑦ 沉淀溶解 · 金属离子浓度随 pH 或沉淀剂浓度</option>
+        <option value="ptit">⑧ 分步沉淀 · pX 随 AgNO₃ 体积 V</option>
+        <option value="temp">⑨ 温度 · pH 随温度 T</option>
+        <option value="cr">⑩ 铬酸盐 · 稀释与 pH</option>
+      </select>
+      <div class="hint" id="sceneDesc" style="margin:6px 2px 2px"></div>
+      <div id="params" style="display:flex;flex-direction:column;gap:9px"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">坐标轴</div>
+      <div class="ax">
+        <span class="axl">X</span>
+        <select id="axX"></select>
+        <button class="btn swap" id="swap" title="交换 X 与 Y">⇄</button>
+      </div>
+      <div class="ax">
+        <span class="axl">Y</span>
+        <select id="axY1"></select>
+      </div>
+      <div class="ax">
+        <span class="axl">Y₂</span>
+        <select id="axY2" disabled></select>
+        <label class="chk mini"><input type="checkbox" id="useY2">启用</label>
+      </div>
+      <div class="chk-row" style="gap:10px">
+        <label class="chk mini"><input type="checkbox" id="revX">X 反向</label>
+        <label class="chk mini"><input type="checkbox" id="revY">Y 反向</label>
+        <label class="chk mini"><input type="checkbox" id="revY2">Y₂ 反向</label>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input type="number" id="xmin" placeholder="X 最小" style="flex:1" step="any">
+        <input type="number" id="xmax" placeholder="X 最大" style="flex:1" step="any">
+      </div>
+      <div class="row" style="margin-top:4px">
+        <input type="number" id="ymin" placeholder="Y 最小" style="flex:1" step="any">
+        <input type="number" id="ymax" placeholder="Y 最大" style="flex:1" step="any">
+      </div>
+      <div class="hint">X = 横轴，Y = 左纵轴，Y₂ = 右纵轴。⇄ 交换 X 与 Y。<br>轴范围留空＝自动；填写后按你给的范围画（适合复刻样题刻度）。</div>
+    </div>
+
+    <div class="sec" id="cardPick">
+      <div class="sec-t">显示哪几条<span id="pickCount" style="float:right;font-weight:400;color:#94a3b8;letter-spacing:0"></span></div>
+      <div id="seriesPick" style="display:flex;flex-direction:column;gap:2px"></div>
+      <div class="row" style="margin-top:4px">
+        <button class="btn sm" id="pickAll" style="flex:1">全选</button>
+        <button class="btn sm" id="pickInvert" style="flex:1">反选</button>
+      </div>
+      <div class="hint">整组量（δ、lg c、比值等）一次生成多条曲线，在这里勾掉不需要的；灰掉的是当前隐藏的。切换场景会自动复位。</div>
+    </div>
+
+    <div class="sec" id="cardOverlay">
+      <div class="sec-t">曲线组（共用横轴叠加）</div>
+      <div class="row">
+        <button class="btn" id="addLayer" style="flex:1">＋ 把当前曲线叠加到图上</button>
+      </div>
+      <div id="layers" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="row">
+        <input id="batchVals" placeholder="批量：0.1,0.01,0.001" style="flex:1">
+        <button class="btn" id="batchAdd">批量</button>
+      </div>
+      <div class="hint" style="line-height:1.8">
+        <b>怎么用</b><br>
+        ① 先把主图调成第一条（场景 / 物质 / 浓度 / 纵轴量）<br>
+        ② 点「＋ 把当前曲线叠加到图上」，它记住这一刻的参数<br>
+        ③ 再改物质或浓度，重复②，列表里就多一条<br>
+        ④ 每条右侧 ✕ 可删除<br>
+        <b>批量</b>：填 <code>0.1,0.01,0.001</code> 后点「批量」，按当前场景的浓度参数一次生成多条。<br>
+        <b>注意</b>：叠加曲线用虚线区分；切换场景或点预设会清空叠加。
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">显示与模型</div>
+      <div class="chk-row">
+        <label class="chk"><input type="checkbox" id="marks" checked> 关键点</label>
+        <label class="chk"><input type="checkbox" id="activity"> 活度</label>
+        <label class="chk"><input type="checkbox" id="caption" checked> 图注</label>
+        <label class="chk" id="rowDiag45"><input type="checkbox" id="diag45" checked> 45° 辅助线</label>
+        <select id="tickFmt" style="font-size:12.5px;padding:4px 6px;border-radius:8px;border:1px solid #d7dee8"><option value="E">1.0E-12</option><option value="e">1e-12</option><option value="sup">10⁻¹²</option></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label style="font-size:12.5px;color:#475569">图幅比例</label>
+        <select id="aspect" style="flex:1">
+          <option value="4:3">4:3（适合题目插图，默认）</option>
+          <option value="3:2">3:2</option>
+          <option value="1:1">1:1 方形</option>
+          <option value="16:9">16:9 宽屏</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label style="font-size:12.5px;color:#475569">图宽</label>
+        <select id="maxw" style="flex:1">
+          <option value="560" selected>560（紧凑）</option>
+          <option value="680">680（常规）</option>
+          <option value="820">820（大图）</option>
+        </select>
+      </div>
+      <div class="hint">活度 = 用 Davies 方程修正离子间相互作用，结果更接近 pH 计实测值；默认关闭，与教材「活度≈浓度」一致。开启后强电解质溶液的 pH 会明显变化。</div>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="card">
+      <div class="chartbar">
+        <span class="hint" id="status"></span>
+        <span class="spacer"></span>
+        <button class="btn sm" id="exp-svg">SVG</button>
+        <button class="btn sm" id="exp-png">PNG</button>
+        <button class="btn sm" id="exp-csv">CSV</button>
+      </div>
+      <div id="chart" class="chart"></div>
+      <div id="clsTabs" class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"></div>
+    </div>
+
+    <div class="card hidden" id="pickcard">
+      <div class="row" style="padding:5px 4px 7px">
+        <span class="hint" style="white-space:nowrap">选点 &nbsp;lg C =</span>
+        <input type="range" id="pick" min="0" max="1000" step="1">
+        <b id="pickval" style="font-size:12.5px;min-width:96px;text-align:right"></b>
+      </div>
+    </div>
+
+    <div id="cards"></div>
+  </main>
+</div>
+
+<script>/*
+ * chem.js — 水溶液平衡计算核
+ * 浏览器 / Node 双用。无依赖。
+ *
+ * 设计要点
+ *  1) 所有"求 pH"的问题统一化归为电荷平衡方程 f(pH)=0。
+ *     f 在 pH 上严格单调，二分法必然收敛，不需要牛顿迭代、不需要初值。
+ *  2) 物种统一表示为"逐级失质子"的层级 j=0..n，电荷 z_j = z0 - j。
+ *     酸 HnA: z0=0；碱 B: 用其共轭酸 BH+ 表示，z0=+1；
+ *     两性物（氨基酸）z0=+1。
+ *  3) 活度修正（Davies）作为可选开关，默认关闭（与教材一致）。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Chem = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var R = 8.314e-3;          // kJ/(mol·K)
+  var A_DAVIES = 0.509;
+
+  function p2k(p) { return Math.pow(10, -p); }
+  function k2p(k) { return -Math.log10(k); }
+
+  var SUBMAP = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+  function normIon(s) {
+    return String(s)
+      .replace(/[₀-₉]/g, function (c) { return SUBMAP[c]; })
+      .replace(/⁻/g, '-').replace(/⁺/g, '+')
+      .replace(/²/g, '2').replace(/³/g, '3')
+      .replace(/\^/g, '');
+  }
+
+  function interp(table, x) {
+    if (x <= table[0][0]) return table[0][1];
+    var n = table.length;
+    if (x >= table[n - 1][0]) return table[n - 1][1];
+    for (var i = 0; i < n - 1; i++) {
+      var x0 = table[i][0], y0 = table[i][1], x1 = table[i + 1][0], y1 = table[i + 1][1];
+      if (x >= x0 && x <= x1) return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    }
+    return table[n - 1][1];
+  }
+
+  function create(data) {
+    var T_REF = (data.meta && data.meta.T_ref) || 298.15;
+
+    /* ---------------- 温度 ---------------- */
+
+    function pKwAt(T) { return interp(data.pKwTable, T - 273.15); }
+    function kwAt(T) { return p2k(pKwAt(T)); }
+
+    var CONDV = (data.conductivity && data.conductivity.values) || {};
+    var CONDN = {};
+    Object.keys(CONDV).forEach(function (k) { CONDN[normIon(k)] = CONDV[k]; });
+    function lambdaOf(label, z) {
+      var k = normIon(label);
+      if (CONDN[k] !== undefined) return CONDN[k];
+      var az = Math.abs(z || 0);
+      return az === 0 ? 0 : (az === 1 ? 50 : az === 2 ? 70 : 90);
+    }
+
+    function kaAt(pka, dH, T) {
+      var k0 = p2k(pka);
+      if (dH === null || dH === undefined || dH === 0) return k0;
+      return Math.exp(Math.log(k0) - (dH / R) * (1 / T - 1 / T_REF));
+    }
+
+    /* ---------------- 体系解析 ---------------- */
+
+    // 把 acid / base 的 key 统一成 {label, z0, pKa[], dH[], n}
+    function resolve(key, T) {
+      if (key === null || key === undefined || key === 'H2O') {
+        return { key: key, label: '纯水', formula: 'H2O', z0: 0, pKa: [], dH: [], n: 0, strong: false, hasT: false };
+      }
+      var a = data.acids[key];
+      if (a) {
+        return {
+          key: key, label: a.name, formula: a.formula,
+          z0: a.z0 || 0, pKa: a.pKa, dH: a.dH || [], n: a.pKa.length,
+          strong: !!a.strong, hasT: !!(a.dH && a.dH.length && a.dH[0] !== null)
+        };
+      }
+      var b = data.bases[key];
+      if (b) {
+        // B + H2O ⇌ BH+ + OH-   Kb
+        // BH+ ⇌ B + H+          Ka = Kw / Kb
+        return {
+          key: key, label: b.name, formula: b.formula,
+          z0: 1, pKa: [pKwAt(T) - b.pKb[0]], dH: [], n: 1,
+          strong: false, hasT: false
+        };
+      }
+      throw new Error('未知物种: ' + key);
+    }
+
+    function kaListOf(model, T) {
+      var ks = new Array(model.n);
+      for (var i = 0; i < model.n; i++) {
+        ks[i] = kaAt(model.pKa[i], model.dH[i], T);
+      }
+      return ks;
+    }
+
+    /* ---------------- 分布分数 ---------------- */
+
+    // 返回数组 delta[j]，j = 已失去的质子数（0..n）
+    function distributionWith(model, ks, pH) {
+      var n = model.n, h = Math.pow(10, -pH);
+      var P = new Array(n + 1); P[0] = 1;
+      for (var i = 0; i < n; i++) P[i + 1] = P[i] * ks[i];
+      var terms = new Array(n + 1), D = 0;
+      for (var j = 0; j <= n; j++) { terms[j] = P[j] * Math.pow(h, n - j); D += terms[j]; }
+      for (var j2 = 0; j2 <= n; j2++) terms[j2] /= D;
+      return terms;
+    }
+
+    function distribution(key, pH, T, opts) {
+      T = T || T_REF;
+      var model = resolve(key, T);
+      var ks = kaListOf(model, T);
+      if (opts && opts.activity) {
+        var g = gammaOf(model, 1e-3, T); // 占位，实际由 solve 循环决定
+        ks = ks.map(function (k, i) {
+          var zPrev = model.z0 - i, zNext = model.z0 - i - 1;
+          return k * Math.pow(10, -cLog10(g(zPrev)) + cLog10(g(1)) + cLog10(g(zNext)));
+        });
+      }
+      return { deltas: distributionWith(model, ks, pH), model: model, ks: ks };
+    }
+
+    /* ---------------- 活度（Davies） ---------------- */
+
+    function activityCoefficient(z, I) {
+      if (I <= 0) return 1;
+      var s = Math.sqrt(I);
+      var lg = -A_DAVIES * z * z * (s / (1 + s) - 0.3 * I);
+      return Math.pow(10, lg);
+    }
+    function cLog10(x) { return Math.log(x) / Math.LN10; }
+    function gammaOf(model, I) {
+      return function (z) { return activityCoefficient(z, I); };
+    }
+
+    /* ---------------- 电荷平衡 ---------------- */
+
+    // spec = { key, ct, cNa, cCl, cOther }  单位 mol/L
+    function residual(spec, pH, T, ks, model) {
+      var h = Math.pow(10, -pH);
+      var kw = kwAt(T);
+      var d = distributionWith(model, ks, pH);
+      var chargeSum = 0;
+      for (var j = 0; j <= model.n; j++) chargeSum += (model.z0 - j) * d[j];
+      return h - kw / h + (spec.cNa || 0) + (spec.cK || 0) - (spec.cCl || 0) - (spec.cNO3 || 0)
+        + (spec.ct || 0) * chargeSum;
+    }
+
+    function solvePH(spec, T, opts) {
+      T = T || T_REF;
+      var model = resolve(spec.key, T);
+      var ks = kaListOf(model, T);
+      var activity = !!(opts && opts.activity);
+
+      var I = 0;
+      if (activity) I = ionicStrength(spec, 5, T);
+
+      function f(pH) { return residual(spec, pH, T, ksEff(pH), model); }
+
+      function ksEff(pH) {
+        if (!activity) return ks;
+        // 用当前离子强度修正每级 Ka
+        var eff = new Array(model.n);
+        for (var i = 0; i < model.n; i++) {
+          var zH = model.z0 - i, zA = model.z0 - i - 1;
+          var gHA = activityCoefficient(zH, I), gA = activityCoefficient(zA, I), gH = activityCoefficient(1, I);
+          eff[i] = ks[i] * gHA / (gH * gA);
+        }
+        return eff;
+      }
+
+      var lo = -3, hi = 18;
+      if (f(lo) < 0) return lo;
+      if (f(hi) > 0) return hi;
+      for (var it = 0; it < 80; it++) {
+        var mid = (lo + hi) / 2;
+        if (f(mid) > 0) lo = mid; else hi = mid;
+      }
+      var pH = (lo + hi) / 2;
+
+      if (activity) {
+        // 外层自洽迭代：pH → I → γ → pH
+        for (var k = 0; k < 12; k++) {
+          var spec2 = concentrations(spec, pH, T, opts);
+          var Inew = 0.5 * (spec2.ions.reduce(function (s, x) { return s + x.c * x.z * x.z; }, 0));
+          if (Math.abs(Inew - I) < 1e-10) break;
+          I = Inew;
+          var lo2 = -3, hi2 = 18;
+          for (var it2 = 0; it2 < 70; it2++) {
+            var m2 = (lo2 + hi2) / 2;
+            if (f(m2) > 0) lo2 = m2; else hi2 = m2;
+          }
+          pH = (lo2 + hi2) / 2;
+        }
+        // 电荷平衡给出的是"浓度 pH"，仪器（和真实 pH）测的是活度：
+        //   pH = -lg a(H+) = -lg(γ·h) = pH_conc - lg γ
+        pH = pH - cLog10(activityCoefficient(1, I));
+      }
+      return pH;
+    }
+
+    function ionicStrength(spec, pH, T) {
+      if (pH === undefined) pH = 5;
+      var c = concentrations(spec, pH, T);
+      var I = 0;
+      for (var i = 0; i < c.ions.length; i++) {
+        var z = c.ions[i].z;
+        I += 0.5 * c.ions[i].c * z * z;
+      }
+      return I;
+    }
+
+    // 给定 pH，返回所有物种浓度
+    function concentrations(spec, pH, T, opts) {
+      T = T || T_REF;
+      var model = resolve(spec.key, T);
+      var ks = kaListOf(model, T);
+      var d = distributionWith(model, ks, pH);
+      var ions = [];
+      var species = [];
+      for (var j = 0; j <= model.n; j++) {
+        var z = model.z0 - j;
+        var c = (spec.ct || 0) * d[j];
+        species.push({ j: j, z: z, c: c, delta: d[j] });
+        if (c > 0) ions.push({ c: c, z: z });
+      }
+      var h = Math.pow(10, -pH), oh = kwAt(T) / h;
+      ions.push({ c: h, z: 1 }, { c: oh, z: -1 });
+      if (spec.cNa) ions.push({ c: spec.cNa, z: 1 });
+      if (spec.cK) ions.push({ c: spec.cK, z: 1 });
+      if (spec.cCl) ions.push({ c: spec.cCl, z: -1 });
+      if (spec.cNO3) ions.push({ c: spec.cNO3, z: -1 });
+      return { pH: pH, h: h, oh: oh, species: species, ions: ions, model: model };
+    }
+
+    /* ---------------- 常见场景 ---------------- */
+
+    // 单一溶液（酸 / 碱 / 盐）
+    function solutionPH(opts) {
+      var T = opts.T || T_REF;
+      var c = opts.c;
+      var spec = { key: opts.key, ct: c };
+      if (opts.type === 'salt') {
+        spec.ct = c * (opts.nAcid || 1);
+        spec.cNa = c * (opts.nCation || 1);
+      } else if (opts.type === 'strongBase') {
+        spec.ct = 0; spec.cNa = c;
+      } else if (opts.type === 'strongAcid') {
+        spec.ct = c; spec.cNa = 0;
+      }
+      return solvePH(spec, T, { activity: opts.activity });
+    }
+
+    // 滴定曲线：用强碱 / 强酸滴定
+    function titration(o) {
+      var T = o.T || T_REF;
+      var cA = o.cAcid, vA = o.vAcid;
+      var pts = [];
+      var n = o.steps || 400;
+      var vMax = (o.vMax !== undefined) ? o.vMax : (cA * vA / o.cTitrant) * 2;
+      for (var i = 0; i <= n; i++) {
+        var v = vMax * i / n;
+        var Vt = vA + v;
+        var spec = { key: o.key, ct: cA * vA / Vt };
+        if (o.titrant === 'base') spec.cNa = o.cTitrant * v / Vt;
+        else spec.cCl = o.cTitrant * v / Vt;
+        pts.push({ v: v, pH: solvePH(spec, T, { activity: o.activity }) });
+      }
+      return pts;
+    }
+
+    // 稀释曲线：把 c 稀释 f 倍（f>1）
+    function dilution(o) {
+      var pts = [], n = o.steps || 120;
+      var lmax = o.lgMax || 3;
+      var c0 = o.c;
+      for (var i = 0; i <= n; i++) {
+        var lg = lmax * i / n;
+        var c = c0 / Math.pow(10, lg);
+        pts.push({ lg: lg, pH: solutionPH({ key: o.key, type: o.type, c: c, T: o.T }) });
+      }
+      return pts;
+    }
+
+    /* ---------------- 沉淀溶解平衡 ---------------- */
+
+    // 氢氧化物 M(OH)m 溶解度随 pH：返回该 pH 下允许的最大 [M]
+    function metalAllowedByPH(saltKey, pH, T) {
+      T = T || T_REF;
+      var s = data.salts[saltKey];
+      var Ksp = p2k(s.pKsp);
+      var oh = kwAt(T) / Math.pow(10, -pH);
+      var mOH = s.nu[1];
+      return Math.pow(Ksp / Math.pow(oh, mOH), 1 / s.nu[0]);
+    }
+
+    // 纯水中溶解度 s（mol/L）
+    function solubility(saltKey, T) {
+      T = T || T_REF;
+      var s = data.salts[saltKey];
+      var Ksp = p2k(s.pKsp);
+      var m = s.nu[0], n = s.nu[1];
+      return Math.pow(Ksp / (Math.pow(m, m) * Math.pow(n, n)), 1 / (m + n));
+    }
+
+    // 1:1 盐的 lg c 直线：给定 lg[A]，返回 lg[M]
+    function lgLine(saltKey, lgA) {
+      var s = data.salts[saltKey];
+      var m = s.nu[0], n = s.nu[1];
+      // [M]^m [A]^n = Ksp  →  lg[M] = (lgKsp - n*lgA)/m
+      return (Math.log10(p2k(s.pKsp)) - n * lgA) / m;
+    }
+
+    /* ---------------- 混合溶液 ---------------- */
+    // spec = { groups:[{key, conc}], cNa, cCl }
+
+    // 指定离子强度下的有效电离常数：Ka' = Ka·γ(未解离)/(γ(H⁺)·γ(已解离))
+    function kaWithActivity(model, T, I) {
+      var ks = kaListOf(model, T).slice();
+      if (!I || I <= 0) return ks;
+      var gH = activityCoefficient(1, I);
+      for (var j = 0; j < ks.length; j++) {
+        var zHA = model.z0 - j, zA = model.z0 - (j + 1);
+        ks[j] = ks[j] * activityCoefficient(zHA, I) / (gH * activityCoefficient(zA, I));
+      }
+      return ks;
+    }
+
+    function mixtureI(spec, pH, T) {
+      var h = Math.pow(10, -pH), kw = kwAt(T), I = 0.5 * (h + kw / h);
+      var ions = [];
+      if (spec.ions && spec.ions.length) ions = spec.ions;
+      else { if (spec.cNa > 0) ions.push({ z: 1, conc: spec.cNa }); if (spec.cCl > 0) ions.push({ z: -1, conc: spec.cCl }); }
+      ions.forEach(function (io) { I += 0.5 * io.conc * io.z * io.z; });
+      spec.groups.forEach(function (g) {
+        var model = resolve(g.key, T);
+        var d = distributionWith(model, kaListOf(model, T), pH);
+        for (var j = 0; j <= model.n; j++) {
+          var z = model.z0 - j;
+          if (z !== 0) I += 0.5 * g.conc * d[j] * z * z;
+        }
+      });
+      return I;
+    }
+
+    function mixtureResidual(spec, pH, T, I) {
+      var h = Math.pow(10, -pH), kw = kwAt(T);
+      var s = h - kw / h;
+      if (spec.ions && spec.ions.length) {
+        for (var q = 0; q < spec.ions.length; q++) s += spec.ions[q].z * spec.ions[q].conc;
+      } else {
+        s += (spec.cNa || 0) - (spec.cCl || 0);
+      }
+      for (var i = 0; i < spec.groups.length; i++) {
+        var g = spec.groups[i];
+        var model = resolve(g.key, T);
+        var d = distributionWith(model, kaWithActivity(model, T, I || 0), pH);
+        var z = 0;
+        for (var j = 0; j <= model.n; j++) z += (model.z0 - j) * d[j];
+        s += g.conc * z;
+      }
+      return s;
+    }
+
+    function solveMixture(spec, T, opts) {
+      T = T || T_REF;
+      var act = !!(opts && opts.activity);
+      function bisect(I) {
+        var lo = -2, hi = 18;
+        if (mixtureResidual(spec, lo, T, I) < 0) return lo;
+        if (mixtureResidual(spec, hi, T, I) > 0) return hi;
+        for (var i = 0; i < 90; i++) {
+          var m = (lo + hi) / 2;
+          if (mixtureResidual(spec, m, T, I) > 0) lo = m; else hi = m;
+        }
+        return (lo + hi) / 2;
+      }
+      if (!act) return bisect(0);
+      // 自洽迭代：pH ← I ← pH
+      var I = 0, pH = bisect(0);
+      for (var it = 0; it < 12; it++) {
+        var In = mixtureI(spec, pH, T);
+        if (Math.abs(In - I) < 1e-6) break;
+        I = In;
+        pH = bisect(I);
+      }
+      return pH;
+    }
+
+    function mixtureSpecies(spec, pH, T, I) {
+      T = T || T_REF;
+      var out = [], h = Math.pow(10, -pH), kw = kwAt(T);
+      out.push({ label: 'H⁺', c: h, kind: 'H', z: 1 });
+      out.push({ label: 'OH⁻', c: kw / h, kind: 'OH', z: -1 });
+      if (spec.ions && spec.ions.length) {
+        spec.ions.forEach(function (ion) {
+          if (ion.conc > 0) out.push({ label: ion.label, c: ion.conc, kind: 'sp', z: ion.z });
+        });
+      } else {
+        if (spec.cNa > 0) out.push({ label: 'Na⁺', c: spec.cNa, kind: 'sp', z: 1 });
+        if (spec.cCl > 0) out.push({ label: 'Cl⁻', c: spec.cCl, kind: 'sp', z: -1 });
+      }
+      spec.groups.forEach(function (g) {
+        var model = resolve(g.key, T);
+        var d = distributionWith(model, kaWithActivity(model, T, I || 0), pH);
+        var L = (data.labels && data.labels[g.key]) || null;
+        for (var j = 0; j <= model.n; j++) {
+          out.push({
+            label: L ? L[j] : (g.key + '#' + j),
+            c: g.conc * d[j], level: j, n: model.n, kind: 'acid', group: g.key, z: model.z0 - j
+          });
+        }
+      });
+      return out;
+    }
+
+    /* ---------------- 铬酸盐体系 ---------------- */
+
+    function crSpecies(h, totalCr) {
+      var K1 = data.chromium.K1, K2 = data.chromium.K2;
+      // 物料：H + K2H/h + 2H²/K1 = totalCr  →  (2/K1)H² + (1+K2/h)H - totalCr = 0
+      var a = 2 / K1, b = 1 + K2 / h, c = -totalCr;
+      var Hc = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+      return { hc: Hc, cro4: K2 * Hc / h, cr2o7: Hc * Hc / K1 };
+    }
+
+    // 0.1 M K2Cr2O7 与 x mol/L KOH 混合后稀释 n 倍，求 pH
+    function crPH(c0, x, n, T) {
+      T = T || T_REF;
+      var C = 2 * c0 / n;          // 总铬
+      var Ktot = (2 * c0 + x) / n; // 钾离子
+      function f(pH) {
+        var h = Math.pow(10, -pH);
+        var sp = crSpecies(h, C);
+        return Ktot + h - sp.hc - 2 * sp.cro4 - 2 * sp.cr2o7 - kwAt(T) / h;
+      }
+      var lo = -2, hi = 16;
+      if (f(lo) < 0) return lo;
+      if (f(hi) > 0) return hi;
+      for (var i = 0; i < 90; i++) {
+        var m = (lo + hi) / 2;
+        if (f(m) > 0) lo = m; else hi = m;
+      }
+      return (lo + hi) / 2;
+    }
+
+    // 求使 n=1 时恰为中性的 KOH 浓度
+    function crNeutralKOH(c0, T) {
+      var lo = 0, hi = 10 * c0 + 1;
+      for (var i = 0; i < 80; i++) {
+        var m = (lo + hi) / 2;
+        if (crPH(c0, m, 1, T) < 7) lo = m; else hi = m;
+      }
+      return (lo + hi) / 2;
+    }
+
+    return {
+      version: '0.1.0',
+      T_REF: T_REF,
+      pKwAt: pKwAt, kwAt: kwAt, kaAt: kaAt,
+      lambdaOf: lambdaOf, normIon: normIon,
+      activityCoefficient: activityCoefficient,
+      resolve: resolve,
+      distribution: function (key, pH, T) {
+        T = T || T_REF;
+        var model = resolve(key, T);
+        return { deltas: distributionWith(model, kaListOf(model, T), pH), model: model };
+      },
+      // 给定离子强度 I 的活度修正分布（供绘图逐点计算）
+      distributionAtI: function (key, pH, T, I) {
+        T = T || T_REF;
+        var model = resolve(key, T);
+        var ks = kaListOf(model, T);
+        var eff = new Array(model.n);
+        for (var i = 0; i < model.n; i++) {
+          var zHA = model.z0 - i, zA = model.z0 - i - 1;
+          eff[i] = ks[i] * activityCoefficient(zHA, I) /
+            (activityCoefficient(1, I) * activityCoefficient(zA, I));
+        }
+        return { deltas: distributionWith(model, eff, pH), model: model };
+      },
+      pKaAt: function (key, T) { return resolve(key, T || T_REF).pKa.slice(); },
+      solvePH: solvePH,
+      concentrations: concentrations,
+      ionicStrength: ionicStrength,
+      solutionPH: solutionPH,
+      titration: titration,
+      dilution: dilution,
+      metalAllowedByPH: metalAllowedByPH,
+      solubility: solubility,
+      lgLine: lgLine,
+      solveMixture: solveMixture,
+      mixtureSpecies: mixtureSpecies,
+      mixtureI: mixtureI,
+      mixtureResidual: mixtureResidual,
+      crSpecies: crSpecies,
+      crPH: crPH,
+      crNeutralKOH: crNeutralKOH
+    };
+  }
+
+  return { create: create };
+});
+</script>
+<script>
+window.__CHEM_DATA__ = {
+  "meta": {
+    "version": "0.1.0",
+    "T_ref": 298.15,
+    "note": "pKa 为 25℃ 参考值；dH 单位 kJ/mol，为 null 表示无温度数据，界面须标注『无温度数据，按 25℃ 常数绘制』",
+    "sources": {
+      "TEXT": "人教版选修4 教学值",
+      "CRC": "CRC Handbook of Chemistry and Physics, 92nd",
+      "NIST": "NIST SRD46"
+    }
+  },
+
+  "compounds": {
+    "HCl":         { "name": "盐酸",       "groups": {},                     "na": 0, "cl": 1 },
+    "H2SO4":       { "name": "硫酸",       "groups": { "H2SO4": 1 } },
+    "HNO3":        { "name": "硝酸",       "groups": {}, "ions": [{ "label": "NO₃⁻", "z": -1, "n": 1 }] },
+    "HClO4":       { "name": "高氯酸",     "groups": {}, "ions": [{ "label": "ClO₄⁻", "z": -1, "n": 1 }] },
+    "HBr":         { "name": "氢溴酸",     "groups": {}, "ions": [{ "label": "Br⁻", "z": -1, "n": 1 }] },
+    "HI":          { "name": "氢碘酸",     "groups": {}, "ions": [{ "label": "I⁻", "z": -1, "n": 1 }] },
+    "KOH":         { "name": "氢氧化钾",   "groups": {}, "ions": [{ "label": "K⁺", "z": 1, "n": 1 }] },
+    "NaOH":        { "name": "氢氧化钠",   "groups": {},                     "na": 1, "cl": 0 },
+    "HAc":         { "name": "醋酸",       "groups": { "HAc": 1 } },
+    "HCN":         { "name": "氢氰酸",     "groups": { "HCN": 1 } },
+    "HF":          { "name": "氢氟酸",     "groups": { "HF": 1 } },
+    "H2CO3":       { "name": "碳酸",       "groups": { "H2CO3": 1 } },
+    "H2S":         { "name": "氢硫酸",     "groups": { "H2S": 1 } },
+    "H3PO4":       { "name": "磷酸",       "groups": { "H3PO4": 1 } },
+    "H2C2O4":      { "name": "草酸",       "groups": { "H2C2O4": 1 } },
+    "NH3":         { "name": "氨水",       "groups": { "NH3": 1 } },
+    "water":       { "name": "纯水",       "groups": {} },
+    "ClCH2COOH":   { "name": "一氯乙酸",   "groups": { "ClCH2COOH": 1 } },
+    "Cl2CHCOOH":   { "name": "二氯乙酸",   "groups": { "Cl2CHCOOH": 1 } },
+    "Cl3CCOOH":    { "name": "三氯乙酸",   "groups": { "Cl3CCOOH": 1 } },
+    "Gly":         { "name": "甘氨酸",     "groups": { "Gly": 1 } },
+    "EDTA":        { "name": "EDTA",       "groups": { "EDTA": 1 } },
+
+    "NaAc":        { "name": "醋酸钠",     "groups": { "HAc": 1 },           "na": 1 },
+    "NaCN":        { "name": "氰化钠",     "groups": { "HCN": 1 },           "na": 1 },
+    "NaF":         { "name": "氟化钠",     "groups": { "HF": 1 },            "na": 1 },
+    "Na2CO3":      { "name": "碳酸钠",     "groups": { "H2CO3": 1 },         "na": 2 },
+    "NaHCO3":      { "name": "碳酸氢钠",   "groups": { "H2CO3": 1 },         "na": 1 },
+    "Na2S":        { "name": "硫化钠",     "groups": { "H2S": 1 },           "na": 2 },
+    "NaHS":        { "name": "硫氢化钠",   "groups": { "H2S": 1 },           "na": 1 },
+    "Na3PO4":      { "name": "磷酸钠",     "groups": { "H3PO4": 1 },         "na": 3 },
+    "Na2HPO4":     { "name": "磷酸氢二钠", "groups": { "H3PO4": 1 },         "na": 2 },
+    "NaH2PO4":     { "name": "磷酸二氢钠", "groups": { "H3PO4": 1 },         "na": 1 },
+    "Na2SO4":      { "name": "硫酸钠",     "groups": { "H2SO4": 1 },         "na": 2 },
+    "NaHSO4":      { "name": "硫酸氢钠",   "groups": { "H2SO4": 1 },         "na": 1 },
+    "Na2C2O4":     { "name": "草酸钠",     "groups": { "H2C2O4": 1 },        "na": 2 },
+    "NaHC2O4":     { "name": "草酸氢钠",   "groups": { "H2C2O4": 1 },        "na": 1 },
+    "NH4Cl":       { "name": "氯化铵",     "groups": { "NH3": 1 },           "na": 0, "cl": 1 },
+    "CH3COONH4":   { "name": "醋酸铵",     "groups": { "HAc": 1, "NH3": 1 } },
+    "NH4HCO3":     { "name": "碳酸氢铵",   "groups": { "H2CO3": 1, "NH3": 1 } },
+    "(NH4)2CO3":   { "name": "碳酸铵",     "groups": { "H2CO3": 1, "NH3": 2 } },
+    "NH4HS":       { "name": "硫氢化铵",   "groups": { "H2S": 1, "NH3": 1 } }
+  },
+
+  "chromium": {
+    "note": "铬酸盐体系：Cr2O7^2- + H2O ⇌ 2HCrO4^- (K1)，HCrO4^- ⇌ H+ + CrO4^2- (K2)；25℃",
+    "K1": 2.0e-2,
+    "K2": 7.7e-7
+  },
+
+  "conductivity": {
+    "note": "25℃ 极限摩尔电导率 λ∞ /(S·cm²·mol⁻¹)；忽略离子强度与浓度效应，高浓度下偏大",
+    "values": {
+      "H+": 349.8, "OH-": 198.3, "Na+": 50.1, "K+": 73.5,
+      "Cl-": 76.3, "Br-": 78.1, "I-": 76.8, "NO3-": 71.4, "ClO4-": 67.4,
+      "CH3COO-": 40.9, "HCOO-": 54.6, "F-": 55.4, "CN-": 82.0,
+      "NH4+": 73.4, "HCO3-": 44.5, "CO3^2-": 69.3, "SO4^2-": 160.0,
+      "H2PO4-": 36.0, "HPO4^2-": 57.0, "PO4^3-": 69.0, "HS-": 67.0, "S^2-": 100.0
+    }
+  },
+
+  "labels": {    "HCl": ["HCl", "Cl⁻"], "HBr": ["HBr", "Br⁻"], "HI": ["HI", "I⁻"],
+    "HNO3": ["HNO₃", "NO₃⁻"], "HClO4": ["HClO₄", "ClO₄⁻"],
+    "H2SO4": ["H₂SO₄", "HSO₄⁻", "SO₄²⁻"],
+    "HAc": ["CH₃COOH", "CH₃COO⁻"], "HCOOH": ["HCOOH", "HCOO⁻"],
+    "HF": ["HF", "F⁻"], "HClO": ["HClO", "ClO⁻"], "HBrO": ["HBrO", "BrO⁻"],
+    "HCN": ["HCN", "CN⁻"], "PhOH": ["C₆H₅OH", "C₆H₅O⁻"],
+    "PhCOOH": ["C₆H₅COOH", "C₆H₅COO⁻"], "HLa": ["HLac", "Lac⁻"],
+    "ClCH2COOH": ["ClCH₂COOH", "ClCH₂COO⁻"],
+    "Cl2CHCOOH": ["Cl₂CHCOOH", "Cl₂CHCOO⁻"],
+    "Cl3CCOOH": ["Cl₃CCOOH", "Cl₃CCOO⁻"],
+    "H2CO3": ["H₂CO₃", "HCO₃⁻", "CO₃²⁻"],
+    "H2SO3": ["H₂SO₃", "HSO₃⁻", "SO₃²⁻"],
+    "H2S": ["H₂S", "HS⁻", "S²⁻"],
+    "H2C2O4": ["H₂C₂O₄", "HC₂O₄⁻", "C₂O₄²⁻"],
+    "H2SiO3": ["H₂SiO₃", "HSiO₃⁻", "SiO₃²⁻"],
+    "Phthalic": ["H₂Pht", "HPht⁻", "Pht²⁻"],
+    "Adipic": ["H₂Ad", "HAd⁻", "Ad²⁻"],
+    "Salicylic": ["H₂Sal", "HSal⁻", "Sal²⁻"],
+    "Ascorbic": ["H₂Asc", "HAsc⁻", "Asc²⁻"],
+    "H3PO4": ["H₃PO₄", "H₂PO₄⁻", "HPO₄²⁻", "PO₄³⁻"],
+    "Citric": ["H₃Cit", "H₂Cit⁻", "HCit²⁻", "Cit³⁻"],
+    "EDTA": ["H₆Y²⁺", "H₅Y⁺", "H₄Y", "H₃Y⁻", "H₂Y²⁻", "HY³⁻", "Y⁴⁻"],
+    "Gly": ["H₂G⁺", "HG", "G⁻"],
+    "NH3": ["NH₄⁺", "NH₃"], "MeNH2": ["CH₃NH₃⁺", "CH₃NH₂"],
+    "EtNH2": ["C₂H₅NH₃⁺", "C₂H₅NH₂"], "PhNH2": ["C₆H₅NH₃⁺", "C₆H₅NH₂"],
+    "Pyridine": ["C₅H₅NH⁺", "C₅H₅N"]
+  },
+
+  "pKwTable": [
+    [0, 14.94], [5, 14.73], [10, 14.53], [15, 14.35], [20, 14.17], [25, 14.00],
+    [30, 13.83], [35, 13.68], [40, 13.53], [45, 13.39], [50, 13.26], [55, 13.14],
+    [60, 13.02], [70, 12.80], [80, 12.60], [90, 12.42], [100, 12.27]
+  ],
+
+  "acids": {
+    "HCl":      { "name": "盐酸",       "formula": "HCl",     "pKa": [-10],        "dH": null, "strong": true,  "source": "TEXT" },
+    "HBr":      { "name": "氢溴酸",     "formula": "HBr",     "pKa": [-10],        "dH": null, "strong": true,  "source": "TEXT" },
+    "HI":       { "name": "氢碘酸",     "formula": "HI",      "pKa": [-10],        "dH": null, "strong": true,  "source": "TEXT" },
+    "HNO3":     { "name": "硝酸",       "formula": "HNO3",    "pKa": [-1.4],       "dH": null, "strong": true,  "source": "TEXT" },
+    "HClO4":    { "name": "高氯酸",     "formula": "HClO4",   "pKa": [-10],        "dH": null, "strong": true,  "source": "TEXT" },
+    "H2SO4":    { "name": "硫酸",       "formula": "H2SO4",   "pKa": [-3, 1.92],   "dH": null, "strong": true,  "source": "CRC" },
+
+    "HAc":      { "name": "醋酸",       "formula": "CH3COOH", "pKa": [4.756],      "dH": [-0.4], "source": "CRC" },
+    "HCOOH":    { "name": "甲酸",       "formula": "HCOOH",   "pKa": [3.745],      "dH": null, "source": "CRC" },
+    "HF":       { "name": "氢氟酸",     "formula": "HF",      "pKa": [3.17],       "dH": null, "source": "CRC" },
+    "HClO":     { "name": "次氯酸",     "formula": "HClO",    "pKa": [7.53],       "dH": null, "source": "TEXT" },
+    "HBrO":     { "name": "次溴酸",     "formula": "HBrO",    "pKa": [8.63],       "dH": null, "source": "CRC" },
+    "HCN":      { "name": "氢氰酸",     "formula": "HCN",     "pKa": [9.21],       "dH": null, "source": "CRC" },
+    "PhOH":     { "name": "苯酚",       "formula": "C6H5OH",  "pKa": [9.99],       "dH": null, "source": "CRC" },
+    "PhCOOH":   { "name": "苯甲酸",     "formula": "C6H5COOH","pKa": [4.20],       "dH": null, "source": "CRC" },
+    "HLa":      { "name": "乳酸",       "formula": "CH3CHOHCOOH", "pKa": [3.86],   "dH": null, "source": "CRC" },
+
+    "ClCH2COOH":  { "name": "一氯乙酸", "formula": "ClCH2COOH",  "pKa": [2.87], "dH": null, "source": "CRC" },
+    "Cl2CHCOOH":  { "name": "二氯乙酸", "formula": "Cl2CHCOOH",  "pKa": [1.35], "dH": null, "source": "CRC" },
+    "Cl3CCOOH":   { "name": "三氯乙酸", "formula": "Cl3CCOOH",   "pKa": [0.66], "dH": null, "source": "CRC" },
+
+    "H2CO3":    { "name": "碳酸",       "formula": "H2CO3",   "pKa": [6.35, 10.33],  "dH": null, "source": "TEXT" },
+    "H2SO3":    { "name": "亚硫酸",     "formula": "H2SO3",   "pKa": [1.81, 7.20],   "dH": null, "source": "CRC" },
+    "H2S":      { "name": "氢硫酸",     "formula": "H2S",     "pKa": [7.02, 12.90],  "dH": null, "source": "CRC" },
+    "H2C2O4":   { "name": "草酸",       "formula": "H2C2O4",  "pKa": [1.25, 4.27],   "dH": null, "source": "CRC" },
+    "H2SiO3":   { "name": "硅酸",       "formula": "H2SiO3",  "pKa": [9.84, 13.20],  "dH": null, "source": "CRC" },
+    "Phthalic": { "name": "邻苯二甲酸", "formula": "C6H4(COOH)2", "pKa": [2.89, 5.51], "dH": null, "source": "CRC" },
+    "Adipic":   { "name": "己二酸",     "formula": "HOOC(CH2)4COOH", "pKa": [4.43, 5.41], "dH": null, "source": "CRC" },
+    "Salicylic":{ "name": "水杨酸",     "formula": "C6H4(OH)COOH", "pKa": [2.98, 13.60], "dH": null, "source": "CRC" },
+    "Ascorbic": { "name": "抗坏血酸",   "formula": "C6H8O6",  "pKa": [4.17, 11.57],  "dH": null, "source": "CRC" },
+
+    "H3PO4":    { "name": "磷酸",       "formula": "H3PO4",   "pKa": [2.15, 7.20, 12.35], "dH": null, "source": "TEXT" },
+    "Citric":   { "name": "柠檬酸",     "formula": "C6H8O7",  "pKa": [3.13, 4.76, 6.40],  "dH": null, "source": "CRC" },
+    "EDTA":     { "name": "乙二胺四乙酸","formula": "C10H16N2O8", "pKa": [0.00, 1.50, 2.00, 2.66, 6.16, 10.26], "dH": null, "source": "CRC" },
+
+    "Gly":      { "name": "甘氨酸(两性)", "formula": "H3N+CH2COOH", "pKa": [2.35, 9.78], "dH": null, "z0": 1, "source": "CRC" }
+  },
+
+  "bases": {
+    "NH3":      { "name": "氨水",     "formula": "NH3·H2O", "pKb": [4.75], "dH": null, "source": "TEXT" },
+    "MeNH2":    { "name": "甲胺",     "formula": "CH3NH2",  "pKb": [3.36], "dH": null, "source": "CRC" },
+    "EtNH2":    { "name": "乙胺",     "formula": "C2H5NH2", "pKb": [3.25], "dH": null, "source": "CRC" },
+    "PhNH2":    { "name": "苯胺",     "formula": "C6H5NH2", "pKb": [9.37], "dH": null, "source": "CRC" },
+    "Pyridine": { "name": "吡啶",     "formula": "C5H5N",   "pKb": [8.75], "dH": null, "source": "CRC" }
+  },
+
+  "salts": {
+    "AgCl":    { "cation": "Ag+",  "anion": "Cl-",   "nu": [1, 1], "pKsp": 9.75  },
+    "AgBr":    { "cation": "Ag+",  "anion": "Br-",   "nu": [1, 1], "pKsp": 12.27 },
+    "AgI":     { "cation": "Ag+",  "anion": "I-",    "nu": [1, 1], "pKsp": 16.07 },
+    "Ag2CrO4": { "cation": "Ag+",  "anion": "CrO4^2-","nu": [2, 1], "pKsp": 11.95 },
+    "Ag2S":    { "cation": "Ag+",  "anion": "S^2-",  "nu": [2, 1], "pKsp": 49.20 },
+    "BaSO4":   { "cation": "Ba^2+","anion": "SO4^2-","nu": [1, 1], "pKsp": 9.96  },
+    "SrSO4":   { "cation": "Sr^2+","anion": "SO4^2-","nu": [1, 1], "pKsp": 6.49  },
+    "CaSO4":   { "cation": "Ca^2+","anion": "SO4^2-","nu": [1, 1], "pKsp": 4.31  },
+    "CaCO3":   { "cation": "Ca^2+","anion": "CO3^2-","nu": [1, 1], "pKsp": 8.47  },
+    "BaCO3":   { "cation": "Ba^2+","anion": "CO3^2-","nu": [1, 1], "pKsp": 8.29  },
+    "MgCO3":   { "cation": "Mg^2+","anion": "CO3^2-","nu": [1, 1], "pKsp": 5.17  },
+    "CaF2":    { "cation": "Ca^2+","anion": "F-",    "nu": [1, 2], "pKsp": 10.50 },
+    "BaCrO4":  { "cation": "Ba^2+","anion": "CrO4^2-","nu": [1, 1], "pKsp": 9.93  },
+    "Mg(OH)2": { "cation": "Mg^2+","anion": "OH-",   "nu": [1, 2], "pKsp": 10.74 },
+    "Ca(OH)2": { "cation": "Ca^2+","anion": "OH-",   "nu": [1, 2], "pKsp": 5.26  },
+    "Mn(OH)2": { "cation": "Mn^2+","anion": "OH-",   "nu": [1, 2], "pKsp": 12.72 },
+    "Fe(OH)3": { "cation": "Fe^3+","anion": "OH-",   "nu": [1, 3], "pKsp": 38.55 },
+    "Al(OH)3": { "cation": "Al^3+","anion": "OH-",   "nu": [1, 3], "pKsp": 32.89 },
+    "Cu(OH)2": { "cation": "Cu^2+","anion": "OH-",   "nu": [1, 2], "pKsp": 19.66 },
+    "Zn(OH)2": { "cation": "Zn^2+","anion": "OH-",   "nu": [1, 2], "pKsp": 15.50 },
+    "CdS":     { "cation": "Cd^2+","anion": "S^2-",  "nu": [1, 1], "pKsp": 26.10 },
+    "ZnS":     { "cation": "Zn^2+","anion": "S^2-",  "nu": [1, 1], "pKsp": 23.80 },
+    "FeS":     { "cation": "Fe^2+","anion": "S^2-",  "nu": [1, 1], "pKsp": 17.20 },
+    "CuS":     { "cation": "Cu^2+","anion": "S^2-",  "nu": [1, 1], "pKsp": 35.20 },
+    "HgS":     { "cation": "Hg^2+","anion": "S^2-",  "nu": [1, 1], "pKsp": 52.40 },
+    "PbI2":    { "cation": "Pb^2+","anion": "I-",    "nu": [1, 2], "pKsp": 8.15  }
+  },
+
+  "complexes": {
+    "Ag(NH3)2+":  { "metal": "Ag+",  "ligand": "NH3", "n": 2, "logBeta": [7.05] },
+    "Cu(NH3)4^2+":{ "metal": "Cu^2+","ligand": "NH3", "n": 4, "logBeta": [12.03] },
+    "FeSCN^2+":   { "metal": "Fe^3+","ligand": "SCN-","n": 1, "logBeta": [2.95] },
+    "FeF6^3-":    { "metal": "Fe^3+","ligand": "F-",  "n": 6, "logBeta": [11.80] },
+    "Zn(OH)4^2-": { "metal": "Zn^2+","ligand": "OH-", "n": 4, "logBeta": [15.50] }
+  }
+}
+;
+</script>
+<script>(function () {
+  'use strict';
+
+  var DATA = window.__CHEM_DATA__;
+  var chem = window.Chem.create(DATA);
+  var NS = 'http://www.w3.org/2000/svg';
+
+  function $(s) { return document.querySelector(s); }
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(NS, tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  function fmt(v, d) { var p = Math.pow(10, d); return (Math.round(v * p) / p).toFixed(d); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function linspace(a, b, n) { var o = new Array(n + 1); for (var i = 0; i <= n; i++) o[i] = a + (b - a) * i / n; return o; }
+  // 刻度小数位按步长自动决定，避免 6.9~7.1 出现两个 7.0
+  function decOf(step) {
+    if (!(step > 0)) return 0;
+    return Math.max(0, Math.min(4, Math.ceil(-Math.log10(step) - 1e-9)));
+  }
+  function niceStep(range, target) {
+    var raw = range / Math.max(1, target);
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var n = raw / mag;
+    return mag * (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10);
+  }
+
+  var PALETTE = ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#0d9488', '#c026d3'];
+
+  var SUPMAP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  function sup(n) { return String(n).split('').map(function (c) { return SUPMAP[c] || c; }).join(''); }
+  var SUBMAP = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+  function sub(n) { return String(n).split('').map(function (c) { return SUBMAP[c] || c; }).join(''); }
+  function prettyIon(s) {
+    return String(s)
+      .replace(/\^(\d+)([+-])/g, function (_, d, si) { return sup(d) + (si === '+' ? '⁺' : '⁻'); })
+      .replace(/([A-Za-z\)\]])(\d+)/g, function (_, a, d) { return a + sub(d); })
+      .replace(/([A-Za-z0-9)])([+-])$/g, function (_, a, si) { return a + (si === '+' ? '⁺' : '⁻'); });
+  }
+  function fmtSci(v) {
+    if (!isFinite(v) || v <= 0) return '—';
+    var e = Math.floor(Math.log10(v)), m = v / Math.pow(10, e);
+    return m.toFixed(2) + '×10' + sup(e);
+  }
+
+  /* ================= 物种 ================= */
+
+  var SPECIES = [];
+  Object.keys(DATA.acids).forEach(function (k) {
+    var a = DATA.acids[k], g;
+    if (k === 'Gly') g = '两性与氨基酸';
+    else if (a.strong) g = '强酸';
+    else if (a.pKa.length === 1) g = '一元弱酸';
+    else if (a.pKa.length === 2) g = '二元弱酸';
+    else g = '多元酸';
+    SPECIES.push({ key: k, name: a.name, formula: a.formula, group: g });
+  });
+  Object.keys(DATA.bases).forEach(function (k) {
+    var b = DATA.bases[k];
+    SPECIES.push({ key: k, name: b.name, formula: b.formula, group: '弱碱' });
+  });
+  SPECIES.push({ key: 'water', name: '纯水', formula: 'H₂O', group: '其他' });
+  function chemKey(k) { return k === 'water' ? null : k; }
+  function spOf(k) { return SPECIES.find(function (s) { return s.key === k; }) || { name: k, formula: '' }; }
+  function labelsOf(key, model) {
+    var L = DATA.labels[key];
+    if (L && L.length === model.n + 1) return L;
+    return labelsGeneric(model);
+  }
+  function labelsGeneric(model) {
+    var out = [];
+    for (var j = 0; j <= model.n; j++) {
+      var z = model.z0 - j;
+      var sup = z === 0 ? '' : (Math.abs(z) === 1 ? (z > 0 ? '⁺' : '⁻') : (z > 0 ? '²⁺' : '²⁻'));
+      out.push(j === 0 ? (model.formula || 'H' + model.n + 'A') : ('H' + (model.n - j) + 'A' + sup));
+    }
+    return out;
+  }
+
+  /* ================= 计算工具 ================= */
+
+  function ionStrength(key, pH, T, c0) {
+    var model = chem.resolve(key, T), I = 0;
+    for (var k = 0; k < 3; k++) {
+      var d = (k === 0 ? chem.distribution(key, pH, T) : chem.distributionAtI(key, pH, T, I)).deltas;
+      var sum = 0;
+      for (var j = 0; j < d.length; j++) { var z = model.z0 - j; sum += c0 * d[j] * z * z; }
+      var h = Math.pow(10, -pH), oh = chem.kwAt(T) / h;
+      I = 0.5 * (sum + h + oh);
+    }
+    return I;
+  }
+  function distAt(key, pH, T, c0) {
+    if (state.activity) return chem.distributionAtI(key, pH, T, ionStrength(key, pH, T, c0)).deltas;
+    return chem.distribution(key, pH, T).deltas;
+  }
+  // z0=1 表示碱（以共轭酸 BH⁺ 为 j=0 保存），电离度 = 已电离成 BH⁺ 的比例 = δ₀
+  function alphaOf(d, n, z0) {
+    if (!n) return 0;
+    if (z0 === 1) return d[0];
+    var s = 0;
+    for (var j = 1; j <= n; j++) s += j * d[j];
+    return s / n;
+  }
+
+  /* ================= 状态 ================= */
+
+  var state = {
+    scenario: 'aq',
+    activity: false, marks: true, caption: true, cardsOpen: false,
+    axes: { x: '__sweep', y1: 'delta', y2: null, useY2: false, revX: false, revY: false, revY2: false, xmin: null, xmax: null, y1min: null, y1max: null },
+    aspect: '4:3', maxW: 560, diag45: true, notice: '', tickFmt: 'E',
+    hidden: {},
+    overlays: [],
+    aq: { system: 'acid', keys: [], c: 0.1, sweep: 'pH', pHmin: 0, pHmax: 14, lmax: 6, Tc: 25 },
+    tit: { key: 'HAc', c: 0.1, v0: 20, titrant: 'base', ct: 0.1, Tc: 25 },
+    precip: { salts: ['Fe(OH)3'], sweep: 'pH', Tc: 25 },
+    ptit: { salts: ['AgCl', 'AgBr', 'AgI'], c0: 0.1, v0: 20, ct: 0.1, Tc: 25 },
+    cr: { system: 'acid', key: 'HAc', c0: 0.1, x: null, lmax: 6, Tc: 25 },
+    dil: { keys: ['HAc'], c0: 0.1, lmax: 6, Tc: 25 },
+    feed: { denom: 'acid', acid: 'HAc', base: 'NaOH', c0: 0.1, rmax: 3, Tc: 25 },
+    temp: { key: 'water', c: 0.1 },
+    mix: { comps: [{ key: 'H3PO4', ratio: 1 }], cMin: 1e-10, cMax: 1, Tc: 25, pick: null },
+    types: { cls: 'NaHA', acid: 'H2CO3', cMin: 1e-12, cMax: 1, Tc: 25 }
+  };
+
+  var scene = null;      // 当前场景对象
+  var last = null;       // 上次渲染结果
+
+  /* ================= 场景 1：酸碱盐溶液（δ–pH） ================= */
+
+  var COMP_GROUPS = {};
+  var STRONG_ACIDS = ['HCl', 'HBr', 'HI', 'HNO3', 'HClO4', 'H2SO4'];
+  function compGroup(k) {
+    var c = DATA.compounds[k];
+    if (!c) return '其他';
+    if (STRONG_ACIDS.indexOf(k) >= 0) return '强酸';
+    var gs = Object.keys(c.groups || {});
+    if (!gs.length) {
+      if (c.na) return '强碱';
+      if (c.cl || (c.ions && c.ions.length)) return '强酸';
+      return '其他';
+    }
+    if (c.na || c.cl) return '盐类';
+    if (gs.indexOf('NH3') >= 0) return '弱碱';
+    return '弱酸';
+  }
+  function compoundOptions() {
+    return Object.keys(DATA.compounds).map(function (k) {
+      return { key: k, name: DATA.compounds[k].name || k, formula: k, group: compGroup(k) };
+    });
+  }
+  function buildCompSpec(k, c) {
+    var comp = DATA.compounds[k];
+    var groups = {}, ions = [];
+    for (var g in comp.groups) groups[g] = comp.groups[g] * c;
+    if (comp.na) ions.push({ label: 'Na⁺', z: 1, conc: comp.na * c });
+    if (comp.cl) ions.push({ label: 'Cl⁻', z: -1, conc: comp.cl * c });
+    (comp.ions || []).forEach(function (e) { ions.push({ label: e.label, z: e.z, conc: (e.n || 1) * c }); });
+    return {
+      groups: Object.keys(groups).map(function (g) { return { key: g, conc: groups[g] }; }),
+      ions: ions
+    };
+  }
+
+  function sceneAq() {
+    var p = state.aq, T = p.Tc + 273.15;
+    var keys = (p.keys || []).filter(function (k) { return DATA.compounds[k]; });
+    var c = p.c > 0 ? p.c : 0.1;
+    var multi = keys.length > 1;
+    var pHlo = isFinite(p.pHmin) ? p.pHmin : 0;
+    var pHhi = isFinite(p.pHmax) ? p.pHmax : 14;
+    if (pHhi <= pHlo) pHhi = pHlo + 1;
+    var sweep = { id: 'pH', label: 'pH', values: linspace(pHlo, pHhi, 560) };
+
+    function specAt(pH) {
+      var act = !!state.activity;
+      var I = 0, out = [];
+      for (var pass = 0; pass < (act ? 2 : 1); pass++) {
+        out = [];
+        keys.forEach(function (k) {
+          var comp = DATA.compounds[k];
+          var sp = chem.mixtureSpecies(buildCompSpec(k, c), pH, T, I);
+          sp.forEach(function (s) {
+            if (s.kind === 'H' || s.kind === 'OH') return;
+            out.push({ label: s.label, c: s.c, kind: s.kind, level: s.level, n: s.n, group: s.group, z: s.z, comp: comp.name || k });
+          });
+        });
+        var hh = Math.pow(10, -pH);
+        out.push({ label: 'H⁺', c: hh, kind: 'H', z: 1, comp: '' });
+        out.push({ label: 'OH⁻', c: chem.kwAt(T) / hh, kind: 'OH', z: -1, comp: '' });
+        if (act && pass === 0) {
+          I = 0;
+          out.forEach(function (s) { if (s.z) I += 0.5 * s.c * s.z * s.z; });
+        }
+      }
+      return out;
+    }
+
+    function makeState(pH) { return { s: pH, pH: pH, species: specAt(pH) }; }
+
+    // 颜色按「物质+物种」固定分配，保证 δ 视图与 lg c 视图里同一物种颜色一致
+    var COLOR = {};
+    (function () {
+      specAt(7).forEach(function (s) {
+        var k = s.comp + '|' + s.label;
+        if (!(k in COLOR)) COLOR[k] = PALETTE[Object.keys(COLOR).length % PALETTE.length];
+      });
+    })();
+    function colorOfSpecies(s) { return COLOR[s.comp + '|' + s.label]; }
+
+    // δ 按「物质 + 酸根组」分别归一：NH4HCO3 这类含两个离解组的盐必须各自归一
+    function deltaFam(st) {
+      var byGroup = {}, out = [];
+      st.species.forEach(function (s) {
+        if (s.kind !== 'acid') return;
+        var key = s.comp + '|' + (s.group || 'g');
+        (byGroup[key] = byGroup[key] || []).push(s);
+      });
+      Object.keys(byGroup).forEach(function (key) {
+        var list = byGroup[key];
+        var tot = list.reduce(function (a, b) { return a + b.c; }, 0) || 1;
+        var cn = list[0].comp;
+        list.forEach(function (s) {
+          out.push({
+            label: 'δ(' + s.label + ')' + (multi ? '·' + cn : ''),
+            value: s.c / tot,
+            color: colorOfSpecies(s),
+            speciesKey: s.comp + '|' + (s.group || 'g') + '|' + s.label
+          });
+        });
+      });
+      return out;
+    }
+    function allFam(st, mode) {
+      return st.species.map(function (s) {
+        var v = s.c, val = v;
+        if (mode === 'lgc') val = Math.log10(Math.max(v, 1e-30));
+        else if (mode === 'p') val = -Math.log10(Math.max(v, 1e-30));
+        return {
+          label: (mode === 'lgc' ? 'lg ' : mode === 'p' ? 'p' : '') + s.label + (multi ? '·' + s.comp : ''),
+          value: val, color: colorOfSpecies(s),
+          speciesKey: (s.comp || '') + '|' + (s.group || s.kind) + '|' + s.label
+        };
+      });
+    }
+
+    var qs = [
+      { id: '__sweep', label: 'pH', group: '基本', fixed: { min: pHlo, max: pHhi }, get: function (st) { return st.s; } },
+      { id: 'pH', label: 'pH', group: '基本', fixed: { min: pHlo, max: pHhi }, get: function (st) { return st.pH; } },
+      { id: 'lgH', label: 'lg c(H⁺)', group: '基本', get: function (st) { return -st.pH; } },
+      { id: 'lgOH', label: 'lg c(OH⁻)', group: '基本', get: function (st) { return st.pH - chem.pKwAt(T); } },
+      { id: 'pOH', label: 'pOH（= pKw − pH）', group: '基本', get: function (st) { return chem.pKwAt(T) - st.pH; } },
+      { id: 'cwater', label: '水电离出的 c', group: '基本', log: true, get: function (st) { return Math.min(Math.pow(10, -st.pH), chem.kwAt(T) / Math.pow(10, -st.pH)); } },
+      { id: 'delta', label: '分布分数 δ（按酸根组归一）', group: '整组', kind: 'family', fixed: { min: 0, max: 1 }, get: deltaFam },
+      { id: 'conc', label: '浓度 c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return allFam(st, 'conc'); } },
+      { id: 'lgc', label: 'lg c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return allFam(st, 'lgc'); } },
+      { id: 'pC', label: 'pC = −lg c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return allFam(st, 'p'); } }
+    ];
+
+    // 相邻物种浓度比取对数（针对首个物质）：lg[c(A)/c(B)]，斜率 ±1、截距即 pKa
+    (function () {
+      if (!keys.length) return;
+      var fc = DATA.compounds[keys[0]];
+      var gs = Object.keys(fc.groups || {});
+      if (gs.length !== 1) return;
+      var mdl = chem.resolve(gs[0], T);
+      var n0 = mdl.n;
+      if (n0 < 1) return;
+      var compName = fc.name || keys[0];
+      var ls = (DATA.labels && DATA.labels[gs[0]]) || [];
+      for (var j = 0; j < n0; j++) (function (j) {
+        function ratio(st) {
+          var list = st.species.filter(function (s) { return s.kind === 'acid' && s.comp === compName; });
+          var a = list[j] ? list[j].c : 1e-30, b = list[j + 1] ? list[j + 1].c : 1e-30;
+          return Math.log10(Math.max(a, 1e-30) / Math.max(b, 1e-30));
+        }
+        qs.push({ id: 'r0_' + j, label: 'lg[c(' + (ls[j] || ('L' + j)) + ')/c(' + (ls[j + 1] || ('L' + (j + 1))) + ')]', group: '比值', get: ratio });
+        qs.push({ id: 'nr0_' + j, label: '−lg[c(' + (ls[j] || ('L' + j)) + ')/c(' + (ls[j + 1] || ('L' + (j + 1))) + ')]', group: '比值', get: function (st) { return -ratio(st); } });
+        qs.push({ id: 'rs0_' + j, label: 'lg[c(' + (ls[j + 1] || ('L' + (j + 1))) + ')/c(' + (ls[j] || ('L' + j)) + ')]（对调）', group: '比值', get: function (st) { return -ratio(st); } });
+      })(j);
+
+      // 整组版本：一次画出全部相邻比值（多曲线）
+      function pairsOf(st) {
+        var byGroup = {}, out = [];
+        st.species.forEach(function (s) {
+          if (s.kind !== 'acid') return;
+          var k = s.comp + '|' + (s.group || 'g');
+          (byGroup[k] = byGroup[k] || []).push(s);
+        });
+        Object.keys(byGroup).forEach(function (k) {
+          var list = byGroup[k];
+          for (var i = 0; i + 1 < list.length; i++) {
+            out.push({ a: list[i], b: list[i + 1] });
+          }
+        });
+        return out;
+      }
+      qs.push({
+        id: 'ratioFam', label: 'lg 比值（全部相邻物种）', group: '比值', kind: 'family',
+        get: function (st) {
+          return pairsOf(st).map(function (pr) {
+            return {
+              label: 'lg[c(' + pr.a.label + ')/c(' + pr.b.label + ')]',
+              value: Math.log10(Math.max(pr.a.c, 1e-30) / Math.max(pr.b.c, 1e-30))
+            };
+          });
+        }
+      });
+      qs.push({
+        id: 'nratioFam', label: '−lg 比值（全部相邻物种）', group: '比值', kind: 'family',
+        get: function (st) {
+          return pairsOf(st).map(function (pr) {
+            return {
+              label: '−lg[c(' + pr.a.label + ')/c(' + pr.b.label + ')]',
+              value: -Math.log10(Math.max(pr.a.c, 1e-30) / Math.max(pr.b.c, 1e-30))
+            };
+          });
+        }
+      });
+    })();
+
+    return {
+      id: 'aq', sweep: sweep, quantities: qs, makeState: makeState,
+      caption: '酸碱盐溶液 ｜ ' + keys.map(function (k) { return DATA.compounds[k].name || k; }).join(' + ') +
+        '，c=' + c + ' mol/L ｜ ' + (state.activity ? '活度模型' : '理想溶液') + ' ｜ T=' + p.Tc + '℃',
+      paramDefs: [
+        { type: 'keys', id: 'keys', label: '物质（可叠加对比）', value: keys, options: compoundOptions() },
+        { type: 'number', id: 'c', label: '浓度 c', value: c, unit: 'mol/L', step: 0.01, min: 0.0001 },
+        { type: 'number', id: 'pHmin', label: 'pH 下限', value: p.pHmin === undefined ? 0 : p.pHmin, step: 0.5, min: -2 },
+        { type: 'number', id: 'pHmax', label: 'pH 上限', value: p.pHmax === undefined ? 14 : p.pHmax, step: 0.5, min: 0 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ],
+      notes: '酸、碱、正盐、酸式盐、铵盐都在同一个物质表里；选多个即为并排比较。'
+    };
+  }
+
+  /* ================= 场景 1b：稀释（pH–n） ================= */
+
+  function sceneDil() {
+    var p = state.dil, T = p.Tc + 273.15;
+    var keys = (p.keys || []).filter(function (k) { return DATA.compounds[k]; });
+    if (!keys.length) keys = ['HAc'];
+    var c0 = p.c0 > 0 ? p.c0 : 0.1;
+    var lmax = p.lmax === undefined ? 6 : p.lmax;
+    var multi = keys.length > 1;
+    var sweep = { id: 'lgn', label: 'lg n（稀释倍数）', values: linspace(0, lmax, 400) };
+
+    function calc(lg) {
+      var n = Math.pow(10, lg), c = c0 / n;
+      var rows = keys.map(function (k) {
+        var spec = buildCompSpec(k, c);
+        var pH = chem.solveMixture(spec, T, { activity: state.activity });
+        var I = state.activity ? chem.mixtureI(spec, pH, T) : 0;
+        return { k: k, pH: pH, species: chem.mixtureSpecies(spec, pH, T, I) };
+      });
+      return { s: lg, n: n, c: c, rows: rows };
+    }
+
+    function makeState(lg) { return calc(lg); }
+
+    var DCOLOR = {};
+    (function () {
+      makeState(0).rows[0].species.forEach(function (s, i) { DCOLOR[s.label] = PALETTE[i % PALETTE.length]; });
+    })();
+
+    function speciesFam(st, mode) {
+      var sp = st.rows[0].species, out = [];
+      var gs = sp.filter(function (s) { return s.kind === 'acid'; });
+      var tot = gs.reduce(function (a, b) { return a + b.c; }, 0) || 1;
+      sp.forEach(function (s) {
+        var v = s.c, val = v;
+        if (mode === 'delta') { if (s.kind !== 'acid') return; val = s.c / tot; }
+        else if (mode === 'lgc') val = Math.log10(Math.max(v, 1e-30));
+        else if (mode === 'p') val = -Math.log10(Math.max(v, 1e-30));
+        out.push({ label: (mode === 'lgc' ? 'lg ' : mode === 'p' ? 'p' : 'δ(') + s.label + (mode === 'delta' ? ')' : ''), value: val, color: DCOLOR[s.label] });
+      });
+      return out;
+    }
+
+    var qs = [
+      { id: '__sweep', label: 'lg n（稀释倍数）', group: '基本', get: function (st) { return st.s; } },
+      { id: 'n', label: '稀释倍数 n（线性）', group: '基本', get: function (st) { return st.n; } },
+      { id: 'lgn', label: 'lg n（对数）', group: '基本', get: function (st) { return st.s; } }
+    ];
+    if (multi) {
+      qs.push({
+        id: 'pH', label: 'pH（每个物质一条）', group: '基本', kind: 'family',
+        get: function (st) {
+          return st.rows.map(function (r) { return { label: DATA.compounds[r.k].name || r.k, value: r.pH }; });
+        }
+      });
+    } else {
+      qs.push({ id: 'pH', label: 'pH', group: '基本', get: function (st) { return st.rows[0].pH; } });
+      qs.push({ id: 'cwater', label: '水电离出的 c', group: '基本', log: true, get: function (st) { var h = Math.pow(10, -st.rows[0].pH); return Math.min(h, chem.kwAt(T) / h); } });
+      qs.push({ id: 'conc', label: '浓度 c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return speciesFam(st, 'conc'); } });
+      qs.push({ id: 'lgc', label: 'lg c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return speciesFam(st, 'lgc'); } });
+      qs.push({ id: 'pC', label: 'pC = −lg c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return speciesFam(st, 'p'); } });
+      qs.push({ id: 'delta', label: '分布分数 δ（按酸根组归一）', group: '整组', kind: 'family', fixed: { min: 0, max: 1 }, get: function (st) { return speciesFam(st, 'delta'); } });
+    }
+
+    return {
+      id: 'dil', sweep: sweep, quantities: qs, makeState: makeState,
+      caption: '稀释曲线 ｜ ' + keys.map(function (k) { return DATA.compounds[k].name || k; }).join(' + ') +
+        ' 初始 ' + c0 + ' mol/L，稀释 n 倍 ｜ ' + (state.activity ? '活度模型' : '理想溶液') + ' ｜ T=' + p.Tc + '℃',
+      paramDefs: [
+        { type: 'keys', id: 'keys', label: '物质（可多选对比）', value: keys, options: compoundOptions() },
+        { type: 'number', id: 'c0', label: '初始浓度 c₀', value: c0, unit: 'mol/L', step: 0.01, min: 0.0001 },
+        { type: 'number', id: 'lmax', label: '稀释到 lg n 上限', value: lmax, step: 1, min: 1 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ],
+      notes: multi
+        ? '多个物质时各自被稀释，每个物质出一条 pH–n 曲线。'
+        : '曲线按 lg n 等距采样；横轴可在「稀释倍数 n」与「lg n」之间切换。'
+    };
+  }
+  /* ================= 场景 2：酸碱滴定 ================= */
+
+  // 强碱（含二元碱）：滴定场景里以「阳离子 + 等价 OH」处理，不走弱碱模型
+  var STRONG_BASES = {
+    NaOH: { name: '氢氧化钠', formula: 'NaOH', cation: 'Na⁺', nOH: 1 },
+    KOH: { name: '氢氧化钾', formula: 'KOH', cation: 'K⁺', nOH: 1 },
+    'Ca(OH)2': { name: '氢氧化钙', formula: 'Ca(OH)₂', cation: 'Ca²⁺', nOH: 2 },
+    'Ba(OH)2': { name: '氢氧化钡', formula: 'Ba(OH)₂', cation: 'Ba²⁺', nOH: 2 }
+  };
+
+  function sceneTit() {
+    var p = state.tit, T = p.Tc + 273.15;
+    var sb = STRONG_BASES[p.key] || null;
+    var model = sb ? { key: p.key, label: sb.name, formula: sb.formula, z0: 0, pKa: [], n: 0, strong: true } : chem.resolve(p.key, T);
+    var labels = sb ? [] : labelsOf(p.key, model);
+    var n = sb ? 0 : model.n;
+    var nOH = sb ? sb.nOH : 1;
+    var Veq = nOH * p.c * p.v0 / p.ct;
+    var vEnd = Veq * (n > 1 ? n * 1.2 : 2.6);
+    var vList = linspace(0, vEnd, 800);
+    for (var eq = 1; eq <= Math.max(1, n); eq++) vList.push(Veq * eq);
+    if (n === 1) vList.push(Veq / 2);
+    vList = vList.filter(function (v) { return v >= 0 && v <= vEnd + 1e-9; });
+    vList.sort(function (a, b) { return a - b; });
+    var vClean = [];
+    vList.forEach(function (v) { if (!vClean.length || v - vClean[vClean.length - 1] > 1e-6) vClean.push(v); });
+    var sweep = { id: 'V', label: 'V(滴定剂) / mL', values: vClean };
+
+    function makeState(v) {
+      var Vt = p.v0 + v;
+      var C = p.c * p.v0 / Vt;
+      if (sb) {
+        // 强碱被 HCl 滴定：只有阳离子与 Cl⁻，pH 由电荷平衡给出
+        var pHb = chem.solvePH({ key: null, ct: 0, cNa: sb.nOH * C, cCl: p.ct * v / Vt }, T, { activity: state.activity });
+        return { s: v, pH: pHb, d: [1], c: C, model: model, cNa: sb.nOH * C, cCl: p.ct * v / Vt };
+      }
+      var spec = { key: p.key, ct: C };
+      if (p.titrant === 'base') spec.cNa = p.ct * v / Vt;
+      else spec.cCl = p.ct * v / Vt;
+      var pH = chem.solvePH(spec, T, { activity: state.activity });
+      return {
+        s: v, pH: pH, d: distAt(p.key, pH, T, spec.ct), c: spec.ct, model: model,
+        cNa: spec.cNa || 0, cCl: spec.cCl || 0
+      };
+    }
+
+    // 电导率 κ = Σ λᵢ·cᵢ（数值上等于 mS/cm，因 λ/(S·cm²·mol⁻¹) × c/(mol·L⁻¹)）
+    function kappaOf(st) {
+      var h = Math.pow(10, -st.pH), oh = chem.kwAt(T) / h;
+      var k = chem.lambdaOf('H⁺', 1) * h + chem.lambdaOf('OH⁻', -1) * oh;
+      for (var j = 0; j <= n; j++) k += chem.lambdaOf(labels[j], model.z0 - j) * st.d[j] * st.c;
+      k += chem.lambdaOf('Na⁺', 1) * (st.cNa || 0) + chem.lambdaOf('Cl⁻', -1) * (st.cCl || 0);
+      return k;
+    }
+    var kappa0 = kappaOf(makeState(0));
+
+    // 在 pH=7 处补一个精确采样点：水电离曲线在此处是尖峰，等距采样会削平峰顶
+    (function () {
+      var f = function (v) { return makeState(v).pH - 7; };
+      var vals = sweep.values;
+      for (var i = 1; i < vals.length; i++) {
+        var a = f(vals[i - 1]), b = f(vals[i]);
+        if (a === 0) break;
+        if (a * b < 0) {
+          var lo = vals[i - 1], hi = vals[i];
+          for (var k = 0; k < 60; k++) {
+            var m = (lo + hi) / 2;
+            if (f(m) * a <= 0) hi = m; else lo = m;
+          }
+          vals.splice(i, 0, (lo + hi) / 2);
+          break;
+        }
+      }
+    })();
+
+    var qs = [
+      { id: '__sweep', label: sweep.label, group: '基本', get: function (st) { return st.s; } },
+      { id: 'pH', label: 'pH', group: '基本', fixed: { min: 0, max: 14 }, get: function (st) { return st.pH; } },
+      { id: 'alpha', label: '电离度 α', group: '基本', fixed: { min: 0, max: 1 }, get: function (st) { return alphaOf(st.d, n, model.z0); } },
+      { id: 'cwater', label: '水电离出的 c', group: '基本', log: true, get: function (st) { return Math.min(Math.pow(10, -st.pH), chem.kwAt(T) / Math.pow(10, -st.pH)); } },
+      { id: 'kappa', label: '电导率 κ /(mS·cm⁻¹)', group: '基本', get: kappaOf },
+      { id: 'relk', label: '相对电导率 κ/κ₀', group: '基本', get: function (st) { return kappa0 ? kappaOf(st) / kappa0 : 1; } }
+    ];
+    if (n > 0) {
+      qs.push({ id: 'delta', label: '分布分数 δ（各物种一次画全）', group: '整组', kind: 'family', fixed: { min: 0, max: 1 }, get: function (st) { return fam(st, 'delta'); } });
+      qs.push({ id: 'conc', label: '浓度 c（全部物种）', group: '整组', kind: 'family', get: function (st) { return fam(st, 'conc'); } });
+      qs.push({ id: 'lgc', label: 'lg c（全部物种）', group: '整组', kind: 'family', get: function (st) { return fam(st, 'lgc'); } });
+      qs.push({ id: 'pC', label: 'pC = −lg c（全部物种）', group: '整组', kind: 'family', get: function (st) { return fam(st, 'p'); } });
+    }
+    function fam(st, mode) {
+      var out = [];
+      for (var j = 0; j <= n; j++) {
+        var v = mode === 'delta' ? st.d[j] : st.d[j] * st.c;
+        if (mode === 'lgc') v = Math.log10(Math.max(v, 1e-30));
+        else if (mode === 'p') v = -Math.log10(Math.max(st.d[j] * st.c, 1e-30));
+        out.push({ label: labels[j], value: v });
+      }
+      return out;
+    }
+
+    return {
+      id: 'tit', sweep: sweep, quantities: qs, makeState: makeState,
+      keyPoints: function () {
+        // 多元酸/碱要标出每一级等当点，否则第二、第三步突跃看不到
+        var subs = ['', '₁', '₂', '₃', '₄', '₅', '₆'];
+        var out = [];
+        for (var eq = 1; eq <= Math.max(1, n); eq++) {
+          var vv = Veq * eq;
+          out.push({
+            s: vv,
+            label: (n > 1 ? 'V' + subs[eq] : 'V_eq') + '=' + fmt(vv, 2) + ' mL',
+            color: eq === 1 ? '#dc2626' : '#b91c1c'
+          });
+        }
+        if (n === 1 && !model.strong) out.push({ s: Veq / 2, label: '半等当点', color: '#059669' });
+        return out;
+      },
+      caption: '滴定曲线 ｜ ' + (sb ? ('HCl 滴定 ' + sb.name) : (p.ct + ' mol/L ' + (p.titrant === 'base' ? 'NaOH' : 'HCl') + ' 滴定 ' + p.c + ' mol/L ' + spOf(p.key).name)) + ' ｜ ' + p.v0 + ' mL，T=' + p.Tc + '℃',
+      paramDefs: [
+        { type: 'select', id: 'key', label: '被滴定物', value: p.key, options: SPECIES.filter(function (s) { return s.key !== 'water'; }).map(function (s) { return { value: s.key, label: s.name + ' ' + s.formula, group: s.group }; }).concat(Object.keys(STRONG_BASES).map(function (k) { return { value: k, label: STRONG_BASES[k].name + ' ' + STRONG_BASES[k].formula, group: '强碱' }; })) },
+        { type: 'number', id: 'c', label: 'c(被滴定物)', value: p.c, unit: 'mol/L', step: 0.01, min: 0.0001 },
+        { type: 'number', id: 'v0', label: 'V₀', value: p.v0, unit: 'mL', step: 1, min: 1 },
+        { type: 'select', id: 'titrant', label: '滴定剂', value: p.titrant, options: [{ value: 'base', label: 'NaOH（强碱）' }, { value: 'acid', label: 'HCl（强酸）' }] },
+        { type: 'number', id: 'ct', label: 'c(滴定剂)', value: p.ct, unit: 'mol/L', step: 0.01, min: 0.0001 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ],
+      notes: '等当点 V_eq = ' + fmt(Veq, 2) + ' mL'
+    };
+  }
+
+  /* ================= 场景 3：沉淀溶解 ================= */
+
+  function scenePrecip() {
+    var p = state.precip, T = p.Tc + 273.15;
+    var pKw = chem.pKwAt(T);
+    var salts = p.salts.filter(function (k) {
+      var isOH = DATA.salts[k].anion === 'OH-';
+      return p.sweep === 'pH' ? isOH : !isOH;
+    });
+    if (!salts.length) salts = ['Fe(OH)3'];
+    // c 轴视图：横纵任一轴取摩尔浓度时，扫描范围收窄到所选盐的溶解度附近
+    // （多盐时取 [最小 s, 最大 s] 的外包，允许对比，量级差太多的会贴轴）
+    var cMode = p.sweep === 'lgA' && (state.axes.x === 'cA' || state.axes.x === 'cM' || state.axes.y1 === 'cA' || state.axes.y1 === 'cM');
+    var cSmax = 0, cSmin = Infinity;
+    if (cMode) {
+      salts.forEach(function (k) {
+        var it = DATA.salts[k];
+        if (!it) return;
+        var sv = Math.pow(Math.pow(10, -it.pKsp), 1 / (it.nu[0] + it.nu[1]));
+        if (sv > cSmax) cSmax = sv;
+        if (sv < cSmin) cSmin = sv;
+      });
+      if (!isFinite(cSmin)) cSmin = cSmax;
+    }
+    // c 轴窗口：上限取 6s（s=溶解度），扫描范围按「落在窗口内的那段」反解，
+    // 这样任何化学计量的盐都能画满整幅，而不是挤成一条贴轴的直角线
+    var cWinTop = 6 * cSmax;
+    var cSqueezed = [];
+    var cLgLo = -8, cLgHi = 0;
+    if (cMode && cSmax > 0) {
+      var lo0 = Infinity, hi0 = -Infinity;
+      salts.forEach(function (k) {
+        var it = DATA.salts[k];
+        if (!it) return;
+        var Ksp = Math.pow(10, -it.pKsp), a0 = it.nu[0], b0 = it.nu[1];
+        var aMin = Math.pow(Ksp / Math.pow(cWinTop, a0), 1 / b0);
+        if (isFinite(aMin) && aMin > 0) lo0 = Math.min(lo0, Math.log10(aMin));
+        hi0 = Math.max(hi0, Math.log10(cWinTop));
+      });
+      if (!isFinite(lo0)) lo0 = hi0 - 3;
+      cLgLo = lo0 - 0.02;
+      cLgHi = hi0 + 0.02;
+      salts.forEach(function (k) {
+        var it2 = DATA.salts[k];
+        if (!it2) return;
+        var aMin2 = Math.pow(Math.pow(10, -it2.pKsp) / Math.pow(cWinTop, it2.nu[0]), 1 / it2.nu[1]);
+        if (aMin2 / cWinTop < 0.01) cSqueezed.push(k);
+      });
+    }
+    // 采样密度随量程自适应：多盐时跨度可达几十个数量级，固定 400 点会让每条曲线只剩十几个点，
+    // 画出来就是折线（看起来像直角）。这里按跨度放大，单盐仍是 400 点。
+    var spanDec = Math.max(1.6, cLgHi - cLgLo);
+    var nSamp = Math.max(400, Math.min(3000, Math.round(spanDec * 130)));
+    var sweep = p.sweep === 'pH'
+      ? { id: 'pH', label: 'pH', values: linspace(2, 13, 500) }
+      : { id: 'lgA', label: 'lg c(沉淀剂)', values: linspace(cLgLo, cLgHi, nSamp) };
+
+    function lgMOf(key, s) {
+      var st = DATA.salts[key], Ksp = Math.pow(10, -st.pKsp);
+      if (p.sweep === 'pH') {
+        var oh = Math.pow(10, s - pKw);
+        return Math.log10(Math.pow(Ksp / Math.pow(oh, st.nu[1]), 1 / st.nu[0]));
+      }
+      var A = Math.pow(10, s);
+      return Math.log10(Math.pow(Ksp / Math.pow(A, st.nu[1]), 1 / st.nu[0]));
+    }
+    function lgAOf(s) { return p.sweep === 'pH' ? (s - pKw) : s; }
+
+    function makeState(s) {
+      // 金属离子浓度不可能超过盐自身的分析浓度，否则会算出 30 mol/L 这种不可能的数值
+      var cap = Math.log10(p.c0 > 0 ? p.c0 : 0.1);
+      var rows = salts.map(function (k) { return { key: k, lgM: Math.min(lgMOf(k, s), cap), lgA: lgAOf(s) }; });
+      return { s: s, pH: p.sweep === 'pH' ? s : null, rows: rows };
+    }
+
+    var qs = [
+      { id: '__sweep', label: sweep.label, group: '基本', get: function (st) { return st.s; } },
+      { id: 'pA', label: 'p(沉淀剂) = −lg c', group: '基本', get: function (st) { return p.sweep === 'lgA' ? -st.s : NaN; } },
+      { id: 'lgM', label: 'lg c(金属离子)', group: '整组', kind: 'family', log: false, get: function (st) { return st.rows.map(function (r) { return { label: 'lg c(' + prettyIon(DATA.salts[r.key].cation) + ')·' + prettyIon(r.key), value: r.lgM }; }); } },
+      { id: 'pM', label: 'pM = −lg c(金属离子)', group: '整组', kind: 'family', get: function (st) { return st.rows.map(function (r) { return { label: 'p(' + prettyIon(DATA.salts[r.key].cation) + ')·' + prettyIon(r.key), value: -r.lgM }; }); } },
+      { id: 'lgA', label: 'lg c(沉淀剂)', group: '整组', kind: 'family', log: false, get: function (st) { return st.rows.map(function (r) { return { label: 'lg c(' + prettyIon(DATA.salts[r.key].anion) + ')·' + prettyIon(r.key), value: r.lgA }; }); } },
+      { id: 's', label: '溶解度 s', group: '整组', kind: 'family', log: true, get: function (st) { return st.rows.map(function (r) { return { label: 's(' + r.key + ')', value: Math.pow(10, r.lgM) / DATA.salts[r.key].nu[0] }; }); } },
+      { id: 'cM', label: 'c(金属离子) / mol·L⁻¹', group: '整组', kind: 'family', get: function (st) { return st.rows.map(function (r) { return { label: 'c(' + prettyIon(DATA.salts[r.key].cation) + ')·' + prettyIon(r.key), value: Math.pow(10, r.lgM) }; }); } },
+      { id: 'cA', label: 'c(沉淀剂) / mol·L⁻¹', group: '基本', get: function (st) { return st.rows.length ? Math.pow(10, st.rows[0].lgA) : NaN; } },
+    ];
+    if (p.sweep === 'pH') qs.push({ id: 'pH', label: 'pH', group: '基本', fixed: { min: 0, max: 14 }, get: function (st) { return st.pH; } });
+
+    return {
+      id: 'precip', sweep: sweep, quantities: qs, makeState: makeState,
+      cards: { overlay: true, pick: true, diag45: true },
+      win: (cMode && cSmax > 0) ? { x: { min: 0, max: cWinTop }, y: { min: 0, max: cWinTop } } : null,
+      caption: '沉淀溶解平衡 ｜ ' + salts.join(' / ') + ' ｜ 扫描 ' + (p.sweep === 'pH' ? 'pH' : 'lg c(沉淀剂)') + ' ｜ T=' + p.Tc + '℃' +
+        (salts.length > 1 && cMode ? ' ｜ 多盐 c 轴以最大溶解度定标' + (cSqueezed.length ? '；贴合纵轴：' + cSqueezed.join('、') + '（单独勾选才能看清单条）' : '') : ''),
+      paramDefs: [
+        {
+          type: 'select', id: 'sweep', label: '推进方式', value: p.sweep,
+          options: [{ value: 'pH', label: '扫描 pH（仅氢氧化物）' }, { value: 'lgA', label: '扫描 c(沉淀剂)（全部难溶盐）' }]
+        },
+        {
+          type: 'multi', id: 'salt', label: '沉淀（可多选对比）',
+          options: Object.keys(DATA.salts).map(function (k) {
+            var isOH = DATA.salts[k].anion === 'OH-';
+            var need = p.sweep === 'pH' && !isOH;
+            return { value: k, label: k + (need ? '（选它会自动切到 c 模式）' : ''), checked: salts.indexOf(k) >= 0 };
+          })
+        },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ]
+    };
+  }
+
+  /* ================= 场景 3b：分步沉淀滴定 ================= */
+
+  function scenePtit() {
+    var p = state.ptit, T = p.Tc + 273.15;
+    var salts = (p.salts || []).filter(function (k) {
+      var s = DATA.salts[k];
+      return s && s.cation === 'Ag+' && s.anion !== 'S^2-';
+    });
+    if (!salts.length) salts = ['AgCl'];
+
+    var ions = salts.map(function (k) {
+      var s = DATA.salts[k];
+      return {
+        key: k, m: s.nu[0], n: s.nu[1],
+        Ksp: Math.pow(10, -s.pKsp),
+        nTot: p.c0 * p.v0,      // mmol（c0 mol/L × v0 mL）
+        label: prettyIon(s.anion)
+      };
+    });
+
+    // 理论等当点：沉淀完全部阴离子所需的 Ag⁺ 量
+    var nAgEq = ions.reduce(function (s, io) { return s + io.m * io.nTot / io.n; }, 0);
+    var Veq = nAgEq / p.ct;
+    var vMax = Veq * 1.6;
+
+    function solve(v) {
+      var Vt = p.v0 + v;
+      var nAg = p.ct * v;
+      function F(pAg) {
+        var Ag = Math.pow(10, -pAg);
+        var used = 0;
+        for (var i = 0; i < ions.length; i++) {
+          var io = ions[i];
+          var cap = io.nTot / Vt;
+          var eq = Math.pow(io.Ksp / Math.pow(Ag, io.m), 1 / io.n);
+          var free = Math.min(cap, eq);
+          used += io.m * (io.nTot - free * Vt) / io.n;
+        }
+        return Ag + used / Vt - nAg / Vt;
+      }
+      var lo = -2, hi = 18;
+      if (F(lo) < 0) return { pAg: lo };
+      for (var i = 0; i < 90; i++) {
+        var mid = (lo + hi) / 2;
+        if (F(mid) > 0) lo = mid; else hi = mid;
+      }
+      return { pAg: (lo + hi) / 2 };
+    }
+
+    function makeState(v) {
+      var Vt = p.v0 + v;
+      var pAg = solve(v).pAg;
+      var Ag = Math.pow(10, -pAg);
+      var rows = ions.map(function (io) {
+        var cap = io.nTot / Vt;
+        var eq = Math.pow(io.Ksp / Math.pow(Ag, io.m), 1 / io.n);
+        return { key: io.key, label: io.label, free: Math.min(cap, eq) };
+      });
+      return { s: v, pAg: pAg, rows: rows };
+    }
+
+    var sweep = { id: 'V', label: 'V(AgNO₃) / mL', values: linspace(0, vMax, 600) };
+
+    var qs = [
+      { id: '__sweep', label: sweep.label, group: '基本', get: function (st) { return st.s; } },
+      { id: 'pAg', label: 'pAg = −lg c(Ag⁺)', group: '基本', get: function (st) { return st.pAg; } },
+      { id: 'lgAg', label: 'lg c(Ag⁺)', group: '基本', get: function (st) { return -st.pAg; } },
+      {
+        id: 'pX', label: 'pX = −lg c(阴离子)（各离子）', group: '整组', kind: 'family',
+        get: function (st) {
+          return st.rows.map(function (r) {
+            return { label: 'p(' + r.label + ')', value: -Math.log10(Math.max(r.free, 1e-30)) };
+          });
+        }
+      },
+      {
+        id: 'cX', label: 'lg c(阴离子)（各离子）', group: '整组', kind: 'family',
+        get: function (st) {
+          return st.rows.map(function (r) {
+            return { label: 'lg c(' + r.label + ')', value: Math.log10(Math.max(r.free, 1e-30)) };
+          });
+        }
+      }
+    ];
+
+    return {
+      id: 'ptit', sweep: sweep, quantities: qs, makeState: makeState,
+      keyPoints: function () {
+        // 各离子『沉淀完全』的化学计量体积：V₁、V₂、V₃ …… 彼此分开，比『开始沉淀』更可读
+        var subs = ['', '₁', '₂', '₃', '₄', '₅'];
+        var order = ions.slice().sort(function (a, b) { return a.Ksp - b.Ksp; });
+        var out = [], nAg = 0;
+        order.forEach(function (io, i) {
+          nAg += io.m * io.nTot / io.n;
+          var vv = nAg / p.ct;
+          if (vv > vMax) return;
+          out.push({ s: vv, label: 'V' + subs[i + 1] + '=' + fmt(vv, 2) + ' mL', color: i === order.length - 1 ? '#dc2626' : '#64748b' });
+        });
+        return out;
+      },
+      caption: 'AgNO₃ 分步沉淀 ｜ ' + fmt(p.ct, 3) + ' mol/L AgNO₃ 滴定 ' + fmt(p.v0, 1) + ' mL（' +
+        salts.join(' / ') + ' 各 ' + fmt(p.c0, 3) + ' mol/L）｜ T=' + p.Tc + '℃',
+      paramDefs: [
+        {
+          type: 'multi', id: 'ptsalt', label: '被沉淀的离子（可多选）',
+          options: Object.keys(DATA.salts).filter(function (k) {
+            var s = DATA.salts[k];
+            return s.cation === 'Ag+' && s.anion !== 'S^2-';
+          }).map(function (k) {
+            return { value: k, label: k, checked: salts.indexOf(k) >= 0 };
+          })
+        },
+        { type: 'number', id: 'c0', label: '各阴离子浓度 c₀', value: p.c0, unit: 'mol/L', step: 0.01, min: 0.0001 },
+        { type: 'number', id: 'v0', label: 'V₀', value: p.v0, unit: 'mL', step: 1, min: 1 },
+        { type: 'number', id: 'ct', label: 'c(AgNO₃)', value: p.ct, unit: 'mol/L', step: 0.01, min: 0.0001 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ],
+      notes: '理论等当点 V_eq ≈ ' + fmt(Veq, 2) + ' mL（全部阴离子沉淀完全所需 Ag⁺）'
+    };
+  }
+
+  /* ================= 场景 1d：pH–投料比 ================= */
+
+  var STRONG_ACID_KEYS = ['HCl', 'HBr', 'HI', 'HNO3', 'HClO4'];
+
+  function sceneFeed() {
+    var p = state.feed, T = p.Tc + 273.15;
+    var acid = p.acid || 'HAc', base = p.base || 'NaOH';
+    var denom = p.denom === 'base' ? 'base' : 'acid';
+    var c0 = p.c0 > 0 ? p.c0 : 0.1;
+    var rmax = p.rmax > 0 ? p.rmax : 3;
+    var sbase = STRONG_BASES[base] || null;
+    var sweep = { id: 'r', label: '投料比 r', values: linspace(0, rmax, 420) };
+
+    function specAt(r) {
+      var Cden = c0 / (1 + r), Cnum = c0 * r / (1 + r);
+      var groups = [], ions = [];
+      function add(side, conc) {
+        var isAcid = side === 'acid';
+        var key = isAcid ? acid : base;
+        var sb2 = isAcid ? null : (STRONG_BASES[key] || null);
+        if (sb2) { if (conc > 0) ions.push({ label: sb2.cation, z: sb2.nOH, conc: conc }); }
+        else groups.push({ key: key, conc: conc });
+      }
+      add(denom, Cden);
+      add(denom === 'acid' ? 'base' : 'acid', Cnum);
+      return { groups: groups, ions: ions };
+    }
+
+    function makeState(r) {
+      var spec = specAt(r);
+      var pH = chem.solveMixture(spec, T, { activity: state.activity });
+      var I = state.activity ? chem.mixtureI(spec, pH, T) : 0;
+      return { s: r, r: r, pH: pH, species: chem.mixtureSpecies(spec, pH, T, I) };
+    }
+
+    function famOf(st, mode) {
+      return st.species.filter(function (sp) { return sp.kind === 'acid' || sp.kind === 'sp'; }).map(function (sp) {
+        var v = sp.c, val = v;
+        if (mode === 'lgc') val = Math.log10(Math.max(v, 1e-30));
+        else if (mode === 'p') val = -Math.log10(Math.max(v, 1e-30));
+        return { label: (mode === 'lgc' ? 'lg ' : mode === 'p' ? 'p' : '') + sp.label, value: val };
+      });
+    }
+
+    var qs = [
+      { id: '__sweep', label: '投料比 r', group: '基本', get: function (st) { return st.s; } },
+      { id: 'pH', label: 'pH', group: '基本', get: function (st) { return st.pH; } },
+      { id: 'pOH', label: 'pOH（= pKw − pH）', group: '基本', get: function (st) { return chem.pKwAt(T) - st.pH; } },
+      { id: 'cOH', label: 'c(OH⁻)', group: '基本', log: true, get: function (st) { return chem.kwAt(T) / Math.pow(10, -st.pH); } },
+      { id: 'conc', label: '浓度 c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return famOf(st, 'conc'); } },
+      { id: 'lgc', label: 'lg c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return famOf(st, 'lgc'); } },
+      { id: 'pC', label: 'pC = −lg c（全部微粒）', group: '整组', kind: 'family', get: function (st) { return famOf(st, 'p'); } }
+    ];
+
+    var acidOpts = Object.keys(DATA.acids).map(function (k) { return { value: k, label: DATA.acids[k].name + ' ' + DATA.acids[k].formula }; });
+    var baseOpts = Object.keys(DATA.bases).map(function (k) { return { value: k, label: DATA.bases[k].name + ' ' + DATA.bases[k].formula }; })
+      .concat(Object.keys(STRONG_BASES).map(function (k) { return { value: k, label: STRONG_BASES[k].name + ' ' + STRONG_BASES[k].formula }; }));
+
+    return {
+      id: 'feed', sweep: sweep, quantities: qs, makeState: makeState,
+      caption: '投料比曲线 ｜ ' + spOf(acid).name + ' + ' + ((STRONG_BASES[base] || spOf(base)).name) +
+        ' ｜ r = n(' + (denom === 'acid' ? '碱' : '酸') + ')/n(' + (denom === 'acid' ? '酸' : '碱') + ') ｜ c₀=' + c0 + ' mol/L ｜ T=' + p.Tc + '℃',
+      paramDefs: [
+        { type: 'select', id: 'denom', label: '比值分母', value: denom, options: [{ value: 'acid', label: '酸（r = n(碱)/n(酸)）' }, { value: 'base', label: '碱（r = n(酸)/n(碱)）' }] },
+        { type: 'select', id: 'acid', label: '酸', value: acid, options: acidOpts },
+        { type: 'select', id: 'base', label: '碱', value: base, options: baseOpts },
+        { type: 'number', id: 'c0', label: 'c₀（分母物质的分析浓度）', value: c0, unit: 'mol/L', step: 0.01, min: 0.0001 },
+        { type: 'number', id: 'rmax', label: 'r 上限', value: rmax, step: 1, min: 0.5 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ],
+      notes: 'r=1 为恰好中和；r 超过 1 后分子过量。'
+    };
+  }
+
+  /* ================= 场景 1c：铬酸盐（K₂Cr₂O₇ 稀释） ================= */
+
+  function sceneCr() {
+    var p = state.cr, T = p.Tc + 273.15;
+    var c0 = p.c0 > 0 ? p.c0 : 0.5;
+    var x = (p.x === null || p.x === undefined || !(p.x > 0)) ? chem.crNeutralKOH(c0, T) : p.x;
+    var lmax = p.lmax === undefined ? 8 : p.lmax;
+    var sweep = { id: 'lgn', label: 'lg n（稀释倍数）', values: linspace(0, lmax, 400) };
+
+    function makeState(lg) {
+      var n = Math.pow(10, lg);
+      var pH = chem.crPH(c0, x, n, T);
+      var h = Math.pow(10, -pH);
+      var sp = chem.crSpecies(h, 2 * c0 / n);
+      return { s: lg, n: n, pH: pH, sp: sp, crTot: sp.hc + sp.cro4 + 2 * sp.cr2o7 };
+    }
+
+    function dOf(st, which) {
+      var v = which === 'cr2o7' ? 2 * st.sp.cr2o7 : (which === 'hc' ? st.sp.hc : st.sp.cro4);
+      return v / st.crTot;
+    }
+
+    var qs = [
+      { id: '__sweep', label: sweep.label, group: '基本', get: function (st) { return st.s; } },
+      { id: 'n', label: '稀释倍数 n（线性）', group: '基本', get: function (st) { return st.n; } },
+      { id: 'lgn', label: 'lg n（对数）', group: '基本', get: function (st) { return st.s; } },
+      { id: 'pH', label: 'pH', group: '基本', get: function (st) { return st.pH; } },
+      {
+        id: 'delta', label: '分布分数 δ（按 Cr 计）', group: '整组', kind: 'family', fixed: { min: 0, max: 1 },
+        get: function (st) {
+          return [
+            { label: 'δ(Cr₂O₇²⁻)', value: dOf(st, 'cr2o7') },
+            { label: 'δ(HCrO₄⁻)', value: dOf(st, 'hc') },
+            { label: 'δ(CrO₄²⁻)', value: dOf(st, 'cro4') }
+          ];
+        }
+      },
+      {
+        id: 'lgc', label: 'lg c（各含铬微粒）', group: '整组', kind: 'family',
+        get: function (st) {
+          return [
+            { label: 'lg c(Cr₂O₇²⁻)', value: Math.log10(Math.max(st.sp.cr2o7, 1e-30)) },
+            { label: 'lg c(HCrO₄⁻)', value: Math.log10(Math.max(st.sp.hc, 1e-30)) },
+            { label: 'lg c(CrO₄²⁻)', value: Math.log10(Math.max(st.sp.cro4, 1e-30)) }
+          ];
+        }
+      }
+    ];
+
+    return {
+      id: 'cr', sweep: sweep, quantities: qs, makeState: makeState,
+      caption: 'K₂Cr₂O₇ 稀释 ｜ c₀=' + c0 + ' mol/L，KOH=' + fmt(x, 3) + ' mol/L（仅 n=1 时恰为中性）｜ K₁=2.0×10⁻²、K₂=' + DATA.chromium.K2.toExponential(1) + ' ｜ T=' + p.Tc + '℃',
+      paramDefs: [
+        { type: 'number', id: 'c0', label: 'c(K₂Cr₂O₇)', value: c0, unit: 'mol/L', step: 0.05, min: 0.0001 },
+        { type: 'number', id: 'x', label: 'c(KOH)（使溶液中性）', value: +x.toFixed(4), unit: 'mol/L', step: 0.001, min: 0 },
+        { type: 'number', id: 'lmax', label: '稀释到 lg n 上限', value: lmax, step: 1, min: 1 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ],
+      notes: 'K₂=7.7×10⁻⁷ 为原题所用值；文献常见值为 3.2×10⁻⁷（pKa≈6.5），选后者时曲线交叉点会右移约 0.4 个 pH。'
+    };
+  }
+
+  /* ================= 场景 4：温度扫描 ================= */
+
+  function sceneTemp() {
+    var p = state.temp;
+    var sweep = { id: 'T', label: 'T / ℃', values: linspace(0, 100, 400) };
+    var isWater = p.key === 'water';
+    var model = isWater ? null : chem.resolve(p.key, 298.15);
+
+    function makeState(Tc) {
+      var T = Tc + 273.15;
+      if (isWater) return { s: Tc, pH: chem.pKwAt(T) / 2, pKw: chem.pKwAt(T), d: null, c: 0, model: null };
+      var pH = chem.solvePH({ key: p.key, ct: p.c }, T, { activity: state.activity });
+      var m = chem.resolve(p.key, T);
+      return { s: Tc, pH: pH, pKw: chem.pKwAt(T), d: distAt(p.key, pH, T, p.c), c: p.c, model: m };
+    }
+
+    var qs = [
+      { id: '__sweep', label: '温度 T / ℃', group: '基本', get: function (st) { return st.s; } },
+      { id: 'pH', label: 'pH', group: '基本', get: function (st) { return st.pH; } },
+      { id: 'pKw', label: 'pKw', group: '基本', get: function (st) { return st.pKw; } }
+    ];
+    if (!isWater) {
+      var n = model.n;
+      qs.push({ id: 'alpha', label: '电离度 α', group: '基本', fixed: { min: 0, max: 1 }, get: function (st) { return alphaOf(st.d, n, model.z0); } });
+      qs.push({
+        id: 'delta', label: '分布分数 δ（各物种一次画全）', group: '整组', kind: 'family', fixed: { min: 0, max: 1 },
+        get: function (st) {
+          var out = [];
+          for (var j = 0; j <= n; j++) out.push({ label: labelsOf(p.key, st.model)[j], value: st.d[j] });
+          return out;
+        }
+      });
+    }
+
+    var opts = SPECIES.map(function (s) { return { value: s.key, label: s.name + ' ' + s.formula, group: s.group }; });
+
+    var rawAcid = DATA.acids[p.key];
+    var hasDH = !isWater && rawAcid && Array.isArray(rawAcid.dH) &&
+      rawAcid.dH.some(function (v) { return v !== null && v !== undefined; });
+    return {
+      id: 'temp', sweep: sweep, quantities: qs, makeState: makeState,
+      caption: '温度扫描 ｜ ' + (isWater ? '纯水' : spOf(p.key).name + ' c=' + p.c + ' mol/L') + ' ｜ ' + (state.activity ? '活度模型' : '理想溶液'),
+      paramDefs: [
+        { type: 'select', id: 'key', label: '体系', value: p.key, options: opts }
+      ].concat(isWater ? [] : [
+        { type: 'number', id: 'c', label: '浓度 c', value: p.c, unit: 'mol/L', step: 0.01, min: 0.0001 }
+      ]),
+      notes: isWater
+        ? '水的离子积按 pKwTable 随温度变化。'
+        : (hasDH
+          ? '该物质的 pKa 已按 ΔH 随温度修正。'
+          : '⚠ 该物质没有温度数据（ΔH 缺失），整条曲线按 25 ℃ 的 pKa 常数绘制，是一条水平线，不代表真实温度效应。')
+    };
+  }
+
+  /* ================= 场景 5：混合溶液（微粒浓度–总浓度） ================= */
+
+  var ACID_COLORS = ['#c2410c', '#a16207', '#1e40af', '#0e7490'];
+
+  function sceneMix() {
+    var p = state.mix, T = p.Tc + 273.15;
+    var comps = p.comps.filter(function (c) { return DATA.compounds[c.key]; });
+    if (!comps.length) comps = [{ key: 'H3PO4', ratio: 1 }];
+    var total = comps.reduce(function (s, c) { return s + (c.ratio > 0 ? c.ratio : 1); }, 0);
+
+    function specAt(c) {
+      var groups = {}, cNa = 0, cCl = 0, ions = [];
+      comps.forEach(function (cp) {
+        var w = (cp.ratio > 0 ? cp.ratio : 1) / total * c;
+        var d = DATA.compounds[cp.key];
+        for (var g in d.groups) groups[g] = (groups[g] || 0) + d.groups[g] * w;
+        cNa += (d.na || 0) * w;
+        cCl += (d.cl || 0) * w;
+        (d.ions || []).forEach(function (e) {
+          ions.push({ label: e.label, z: e.z, conc: (e.n || 1) * w });
+        });
+      });
+      if (cNa > 0) ions.push({ label: 'Na⁺', z: 1, conc: cNa });
+      if (cCl > 0) ions.push({ label: 'Cl⁻', z: -1, conc: cCl });
+      return { groups: Object.keys(groups).map(function (g) { return { key: g, conc: groups[g] }; }), ions: ions };
+    }
+
+    var emin = Math.round(Math.log10(p.cMin)), emax = Math.round(Math.log10(p.cMax));
+    if (emax <= emin) emax = emin + 1;
+    var sweep = { id: 'lgC', label: 'lg 总浓度 / (mol·L⁻¹)', values: linspace(emin, emax, 260) };
+
+    function makeState(lgC) {
+      var c = Math.pow(10, lgC);
+      var spec = specAt(c);
+      var pH = chem.solveMixture(spec, T, { activity: state.activity });
+      var I = state.activity ? chem.mixtureI(spec, pH, T) : 0;
+      return { s: lgC, c: c, pH: pH, species: chem.mixtureSpecies(spec, pH, T, I) };
+    }
+
+    function colorOf(sp) {
+      if (sp.kind === 'H') return '#dc2626';
+      if (sp.kind === 'OH') return '#2563eb';
+      if (sp.kind === 'sp') return '#94a3b8';
+      return ACID_COLORS[Math.min(sp.level, ACID_COLORS.length - 1)];
+    }
+    function dashOf(sp) { return (sp.kind === 'H' || sp.kind === 'OH') ? '5 4' : null; }
+
+    var qs = [
+      { id: '__sweep', label: sweep.label, group: '基本', get: function (st) { return st.s; } },
+      { id: 'pH', label: 'pH', group: '基本', get: function (st) { return st.pH; } },
+      { id: 'cwater', label: '水电离出的 c', group: '基本', log: true, get: function (st) { return Math.min(Math.pow(10, -st.pH), chem.kwAt(T) / Math.pow(10, -st.pH)); } },
+      {
+        id: 'lgc', label: 'lg c（全部微粒）', group: '整组', kind: 'family',
+        get: function (st) {
+          return st.species.map(function (sp) {
+            return {
+              label: 'lg c(' + sp.label + ')',
+              value: Math.log10(Math.max(sp.c, 1e-30)),
+              color: colorOf(sp), dash: dashOf(sp)
+            };
+          });
+        }
+      },
+      {
+        id: 'pC', label: 'pC = −lg c（全部微粒）', group: '整组', kind: 'family',
+        get: function (st) {
+          return st.species.map(function (sp) {
+            return {
+              label: 'p(' + sp.label + ')',
+              value: -Math.log10(Math.max(sp.c, 1e-30)),
+              color: colorOf(sp), dash: dashOf(sp)
+            };
+          });
+        }
+      }
+    ];
+
+    return {
+      id: 'mix', sweep: sweep, quantities: qs, makeState: makeState,
+      caption: '混合溶液 ｜ ' + comps.map(function (c) { return (DATA.compounds[c.key].name || c.key); }).join(' + ') +
+        ' ｜ 总浓度 10^' + emin + ' ~ 10^' + emax + ' mol/L ｜ T=' + p.Tc + '℃',
+      paramDefs: [
+        { type: 'comps', id: 'comps', label: '物质与投料比', value: comps },
+        { type: 'number', id: 'emin', label: 'c总 下限 10^（各组分形式浓度之和）', value: emin, step: 1, min: -30, max: 3 },
+        { type: 'number', id: 'emax', label: 'c总 上限 10^', value: emax, step: 1, min: -30, max: 3 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ]
+    };
+  }
+
+  /* ================= 场景 10：溶液类型（九类溶液的微粒浓度–总浓度） ================= */
+
+  var TYPE_CLASSES = [
+    { key: 'HA', label: '稀释 · HA', need: 1, hint: '一元弱酸' },
+    { key: 'NaA', label: '稀释 · NaA', need: 1, hint: '强碱弱酸盐' },
+    { key: 'NH4A', label: '稀释 · NH₄A', need: 1, hint: '弱酸弱碱盐' },
+    { key: 'H2A', label: '稀释 · H₂A', need: 2, hint: '二元弱酸' },
+    { key: 'NaHA', label: '稀释 · NaHA', need: 2, hint: '酸式盐' },
+    { key: 'Na2A', label: '稀释 · Na₂A', need: 2, hint: '正盐' },
+    { key: 'NH4HA', label: '稀释 · NH₄HA', need: 2, hint: '弱碱酸式盐' },
+    { key: '(NH4)2A', label: '稀释 · (NH₄)₂A', need: 2, hint: '弱碱正盐' },
+    { key: 'H3A', label: '稀释 · H₃A', need: 3, hint: '三元弱酸' }
+  ];
+
+  function typeOf(key) {
+    for (var i = 0; i < TYPE_CLASSES.length; i++) if (TYPE_CLASSES[i].key === key) return TYPE_CLASSES[i];
+    return TYPE_CLASSES[0];
+  }
+
+  function sceneTypes() {
+    var p = state.types, T = p.Tc + 273.15;
+    var cls = typeOf(p.cls || 'HA');
+    var acidKey = p.acid && DATA.acids[p.acid] ? p.acid : 'H2CO3';
+    function fits(n) {
+      if (cls.key === 'HA' || cls.key === 'NaA' || cls.key === 'NH4A') return n === 1;
+      if (cls.key === 'H3A') return n === 3;
+      return n >= 2;
+    }
+    var model = chem.resolve(acidKey, T);
+    var okAcid = fits(model.n);
+    if (!okAcid) {
+      // 元数不够时自动换成能用的最小二元/三元酸，避免画空图
+      var pool = Object.keys(DATA.acids).filter(function (k) { return fits(chem.resolve(k, T).n) && !DATA.acids[k].strong; });
+      if (pool.length) { acidKey = pool[0]; model = chem.resolve(acidKey, T); okAcid = true; }
+    }
+
+    function specAt(c) {
+      var groups = [{ key: acidKey, conc: c }], ions = [];
+      if (p.cls === 'NaA' || p.cls === 'NaHA') ions.push({ label: 'Na⁺', z: 1, conc: c });
+      if (p.cls === 'Na2A') ions.push({ label: 'Na⁺', z: 1, conc: 2 * c });
+      if (p.cls === 'NH4A' || p.cls === 'NH4HA') groups.push({ key: 'NH3', conc: c });
+      if (p.cls === '(NH4)2A') groups.push({ key: 'NH3', conc: 2 * c });
+      return { groups: groups, ions: ions };
+    }
+
+    var e1 = Math.round(Math.log10(p.cMin || 1e-12)), e2 = Math.round(Math.log10(p.cMax || 1));
+    if (e2 <= e1) e2 = e1 + 1;
+    var sweep = { id: 'lgC', label: 'lg c(总浓度)', values: linspace(e1, e2, 260) };
+
+    function makeState(lgC) {
+      var c = Math.pow(10, lgC);
+      var spec = specAt(c);
+      var pH = chem.solveMixture(spec, T, { activity: state.activity });
+      var I = state.activity ? chem.mixtureI(spec, pH, T) : 0;
+      return { s: lgC, c: c, pH: pH, species: chem.mixtureSpecies(spec, pH, T, I) };
+    }
+
+    var cAcid = 0, cBase = 0, cNa = 0;
+    (function () {
+      if (p.cls === 'NaA' || p.cls === 'NaHA') cNa = 1;
+      if (p.cls === 'Na2A') cNa = 2;
+      if (p.cls === 'NH4A' || p.cls === 'NH4HA') cBase = 1;
+      if (p.cls === '(NH4)2A') cBase = 2;
+      cAcid = 1;
+    })();
+
+    function colorOf(sp) {
+      if (sp.kind === 'H') return '#dc2626';
+      if (sp.kind === 'OH') return '#2563eb';
+      if (sp.kind === 'sp') return '#94a3b8';
+      return ACID_COLORS[Math.min(sp.level, ACID_COLORS.length - 1)];
+    }
+
+    var qs = [
+      { id: '__sweep', label: 'lg c(总浓度)', group: '基本', get: function (st) { return st.s; } },
+      { id: 'ctot', label: 'c(总浓度)', group: '基本', log: true, get: function (st) { return st.c; } },
+      { id: 'pH', label: 'pH', group: '基本', dash: '6 4', color: '#475569', get: function (st) { return st.pH; } },
+      { id: 'pOH', label: 'pOH', group: '基本', get: function (st) { return chem.pKwAt(T) - st.pH; } },
+      {
+        id: 'c', label: '粒子浓度 c', group: '整组', kind: 'family', log: true,
+        get: function (st) {
+          return st.species.map(function (sp) {
+            return { label: '[' + sp.label + ']', value: Math.max(sp.c, 1e-30), color: colorOf(sp) };
+          });
+        }
+      },
+      {
+        id: 'lgc', label: 'lg c', group: '整组', kind: 'family',
+        get: function (st) {
+          return st.species.map(function (sp) {
+            return { label: 'lg c(' + sp.label + ')', value: Math.log10(Math.max(sp.c, 1e-30)), color: colorOf(sp) };
+          });
+        }
+      }
+    ];
+
+    var acidOpts = Object.keys(DATA.acids)
+      .filter(function (k) { return DATA.acids[k].pKa && DATA.acids[k].pKa.length >= 1 && !DATA.acids[k].strong && fits(DATA.acids[k].pKa.length); })
+      .map(function (k) { return { value: k, label: DATA.acids[k].name + ' ' + DATA.acids[k].formula }; });
+
+    return {
+      id: 'types', sweep: sweep, quantities: qs, makeState: makeState,
+      cards: { overlay: false, pick: true, diag45: false },
+      xTitle: 'c / (mol·L⁻¹)', y1Title: '粒子浓度 / (mol·L⁻¹)', y2Title: 'pH',
+      caption: cls.label.replace('稀释 · ', '') + ' 溶液稀释系列 ｜ ' + spOf(acidKey).name + ' ｜ ' + cls.hint +
+        ' ｜ 总浓度 10^' + e1 + ' ~ 10^' + e2 + ' mol/L ｜ T=' + p.Tc + '℃',
+      paramDefs: [
+        { type: 'select', id: 'acid', label: '酸', value: acidKey, options: acidOpts },
+        { type: 'number', id: 'emin', label: 'c总 下限 10^（各组分形式浓度之和）', value: e1, step: 1, min: -30, max: 3 },
+        { type: 'number', id: 'emax', label: 'c总 上限 10^', value: e2, step: 1, min: -30, max: 3 },
+        { type: 'range', id: 'Tc', label: '温度', value: p.Tc, min: 0, max: 100, unit: '℃' }
+      ]
+    };
+  }
+
+  function buildScene() {
+    if (state.scenario === 'aq') return sceneAq();
+    if (state.scenario === 'dil') return sceneDil();
+    if (state.scenario === 'mix') return sceneMix();
+    if (state.scenario === 'types') return sceneTypes();
+    if (state.scenario === 'tit') return sceneTit();
+    if (state.scenario === 'precip') return scenePrecip();
+    if (state.scenario === 'ptit') return scenePtit();
+    if (state.scenario === 'feed') return sceneFeed();
+    if (state.scenario === 'cr') return sceneCr();
+    return sceneTemp();
+  }
+
+  /* ================= 序列构建 ================= */
+
+  function findQIn(sc, id) {
+    var q = sc.quantities.find(function (q) { return q.id === id; });
+    return q || sc.quantities[0];
+  }
+
+  // 把叠加层（另一组场景参数）换算成曲线，附加到当前图
+  function overlaySeries() {
+    var out = [];
+    (state.overlays || []).forEach(function (ov, oi) {
+      var savedSc = state.scenario, savedP = state[savedSc];
+      try {
+        state.scenario = ov.scenario; state[ov.scenario] = ov.params;
+        var sc = buildScene();
+        var xq = findQIn(sc, ov.x), yq = findQIn(sc, ov.y);
+        var sts = sc.sweep.values.map(sc.makeState);
+        if (yq.kind === 'family') {
+          var probe = yq.get(sts[0]);
+          probe.forEach(function (it, k) {
+            out.push({
+              key: 'ov' + oi + '|' + it.label,
+              label: ov.label + ' · ' + it.label,
+              color: it.color || PALETTE[(oi * 3 + k) % PALETTE.length],
+              dash: '5 4',
+              axis: 'left',
+              pts: sts.map(function (st) {
+                var xs = xq.get(st), ys = yq.get(st);
+                return { x: Array.isArray(xs) ? xs[0].value : xs, y: ys[k] ? ys[k].value : NaN };
+              })
+            });
+          });
+        } else {
+          out.push({
+            key: 'ov' + oi,
+            label: ov.label,
+            color: PALETTE[(oi + 4) % PALETTE.length],
+            dash: '5 4',
+            axis: 'left',
+            pts: sts.map(function (st) { return { x: xq.get(st), y: yq.get(st) }; })
+          });
+        }
+      } catch (e) { /* 叠加失败不影响主图 */ }
+      finally { state.scenario = savedSc; state[savedSc] = savedP; }
+    });
+    return out;
+  }
+  function findQ(id) {
+    var q = scene.quantities.find(function (q) { return q.id === id; });
+    return q || scene.quantities[0];
+  }
+
+  function buildSeries() {
+    var xq = findQ(state.axes.x), y1q = findQ(state.axes.y1);
+    var y2q = state.axes.useY2 && state.axes.y2 ? findQ(state.axes.y2) : null;
+    var states = scene.sweep.values.map(scene.makeState);
+    var series = [];
+
+    function addFamily(q, axis) {
+      var probe = q.get(states[0]);
+      var k = probe.length;
+      for (var i = 0; i < k; i++) {
+        series.push({
+          key: q.id + '|' + (probe[i].speciesKey || probe[i].label),
+          label: probe[i].label,
+          color: probe[i].color || PALETTE[series.length % PALETTE.length],
+          dash: probe[i].dash || null,
+          axis: axis,
+          pts: states.map(function (st) { var it = q.get(st)[i]; return { x: xq.get(st), y: it.value }; })
+        });
+      }
+    }
+    function addScalar(q, axis) {
+      series.push({
+        key: q.id,
+        label: q.label, color: q.color || PALETTE[series.length % PALETTE.length], axis: axis, dash: q.dash || null,
+        pts: states.map(function (st) { return { x: xq.get(st), y: q.get(st) }; })
+      });
+    }
+
+    // 横轴可以是整组量（δ、lg c 等）：按物种身份与纵轴配对
+    var xFam = xq.kind === 'family';
+    var y1Fam = y1q.kind === 'family';
+    function pickItem(list, key, idx) {
+      if (key) {
+        for (var q = 0; q < list.length; q++) if (list[q].speciesKey === key) return list[q];
+        return null;
+      }
+      return list[idx] || null;
+    }
+    if (xFam) {
+      var xp = xq.get(states[0]);
+      var yp = y1Fam ? y1q.get(states[0]) : null;
+      xp.forEach(function (xi, ii) {
+        var yi = yp ? pickItem(yp, xi.speciesKey, ii) : null;
+        if (yp && !yi) return;
+        series.push({
+          key: xq.id + '|' + (xi.speciesKey || xi.label),
+          label: yi ? yi.label : xi.label,
+          color: (yi && yi.color) || xi.color || PALETTE[series.length % PALETTE.length],
+          dash: (yi && yi.dash) || null,
+          axis: 'left',
+          pts: states.map(function (st) {
+            var xs = xq.get(st), ys = y1q.get(st);
+            var xo = pickItem(xs, xi.speciesKey, ii);
+            var yo = yp ? pickItem(ys, xi.speciesKey, ii) : null;
+            return { x: xo ? xo.value : NaN, y: yp ? (yo ? yo.value : NaN) : ys };
+          })
+        });
+      });
+    } else {
+      if (y1Fam) addFamily(y1q, 'left'); else addScalar(y1q, 'left');
+    }
+    if (y2q && !xFam) { if (y2q.kind === 'family') addFamily(y2q, 'right'); else addScalar(y2q, 'right'); }
+    overlaySeries().forEach(function (s) { series.push(s); });
+
+    var marks = [];
+    // 横轴是整组量时没有统一的 s→x 映射，关键点无法定位，直接跳过（否则坐标是 NaN）
+    if (!xFam && state.marks && scene.keyPoints) {
+      scene.keyPoints().forEach(function (kp) {
+        var st = states.reduce(function (b, s) { return Math.abs(s.s - kp.s) < Math.abs(b.s - kp.s) ? s : b; }, states[0]);
+        marks.push({
+          x: xq.get(st),
+          y: y1q.kind === 'family' ? null : y1q.get(st),
+          label: kp.label, color: kp.color
+        });
+      });
+    }
+
+    // 45° 辅助线：两轴同为「c / lg / p」同一族时才有意义
+    var diag45on = false;
+    if (state.diag45) {
+      var xid = xq.id, yid = y1q.id;
+      if ((xid === 'cA' && yid === 'cM') || (xid === 'pA' && yid === 'pM')) diag45on = true;
+      if (xid === '__sweep' && yid === 'lgM' && state.scenario === 'precip' && state.precip && state.precip.sweep === 'lgA') diag45on = true;
+    }
+
+    // 勾选过滤：整组量可只显示其中几条
+    var allSeries = series.slice();
+    if (state.hidden) series = series.filter(function (s) { return !state.hidden[state.scenario + '::' + s.key]; });
+
+    // 单盐 c–c 图：两轴取同一量程（0 ~ 2.2s），否则双曲线会被压成贴底的直线
+    var win = (scene && scene.win) || null;
+    if (!win && state.scenario === 'precip' && xq.id === 'cA' && y1q.id === 'cM' && (state.precip.salts || []).length === 1) {
+      var s0 = DATA.salts[state.precip.salts[0]];
+      if (s0) {
+        var sol = Math.pow(Math.pow(10, -s0.pKsp), 1 / (s0.nu[0] + s0.nu[1]));
+        if (isFinite(sol) && sol > 0) win = { x: { min: 0, max: sol * 2.2 }, y: { min: 0, max: sol * 2.2 } };
+      }
+    }
+
+    return { series: series, all: allSeries, win: win, xq: xq, y1q: y1q, y2q: y2q, marks: marks, states: states,
+      xTitle: scene && scene.xTitle, y1Title: scene && scene.y1Title, y2Title: scene && scene.y2Title,
+      revX: !!state.axes.revX, revY: !!state.axes.revY, revY2: !!state.axes.revY2, diag: diag45on };
+  }
+
+  /* ================= 交点 ================= */
+
+  function findIntersections(arr) {
+    var out = [];
+    for (var a = 0; a < arr.length; a++) {
+      for (var b = a + 1; b < arr.length; b++) {
+        var A = arr[a].pts, B = arr[b].pts;
+        if (A.length !== B.length || A.length < 3) continue;
+        var d0 = A[0].y - B[0].y;
+        for (var k = 1; k < A.length; k++) {
+          var d1 = A[k].y - B[k].y;
+          if (!isFinite(d0) || !isFinite(d1)) { d0 = d1; continue; }
+          if (d0 === 0) d0 = 1e-12;
+          if (d0 * d1 < 0) {
+            var t = d0 / (d0 - d1);
+            var x0 = A[k - 1].x, x1 = A[k].x;
+            var y0 = A[k - 1].y, y1 = A[k].y;
+            var ix = x0 + t * (x1 - x0);
+            var iy = y0 + t * (y1 - y0);
+            if (!out.some(function (p) { return Math.abs(p.x - ix) < 1e-4 && p.aLabel === arr[a].label && p.bLabel === arr[b].label; })) {
+              out.push({ x: ix, y: iy, aLabel: arr[a].label, bLabel: arr[b].label, aColor: arr[a].color, bColor: arr[b].color });
+            }
+          }
+          d0 = d1;
+        }
+      }
+    }
+    return out;
+  }
+
+  /* ================= 绘图 ================= */
+
+  function autoRange(vals, isLog) {
+    var lo = Infinity, hi = -Infinity;
+    vals.forEach(function (v) {
+      if (!isFinite(v)) return;
+      if (isLog) { if (v > 0) { var lv = Math.log10(v); lo = Math.min(lo, lv); hi = Math.max(hi, lv); } }
+      else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    });
+    if (!isFinite(lo)) return isLog ? { min: -8, max: 0 } : { min: 0, max: 1 };
+    if (isLog) { return { min: Math.floor(lo), max: Math.ceil(hi) }; }
+    // 数据退化（全 0 或全部相等）时给一个人为区间，避免步长算成 0 导致死循环
+    if (!(hi - lo > 0)) {
+      var pad0 = Math.abs(hi) > 0 ? Math.abs(hi) * 0.5 : 1;
+      return { min: hi - pad0, max: hi + pad0 };
+    }
+    var pad = (hi - lo) * 0.06;
+    return { min: lo - pad, max: hi + pad };
+  }
+  // 刻度标签：量级极端时用科学计数法（否则小到 1e-14 的刻度全显示 0.0000）
+  var SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  function supOf(n) { return String(n).split('').map(function (ch) { return SUP[ch] || ch; }).join(''); }
+  // 对数刻度：1.0E-12 / 1e-12 / 10⁻¹² 三种写法
+  function fmtLogTick(exp) {
+    var f = state.tickFmt || 'E';
+    if (f === 'e') return '1e' + exp;
+    if (f === 'sup') return '10' + supOf(exp);
+    return '1.0E' + (exp >= 0 ? '+' : '-') + Math.abs(exp).toString().padStart(2, '0');
+  }
+
+  function fmtTick(v, step) {
+    var mx = Math.max(Math.abs(v), Math.abs(step));
+    if (mx !== 0 && (mx < 1e-3 || mx >= 1e5)) {
+      var d = Math.max(0, Math.min(3, Math.ceil(-Math.log10(Math.abs(step))) - 1));
+      return v.toExponential(d);
+    }
+    return fmt(v, decOf(step));
+  }
+
+  // 刻度生成前统一兜底：步长必须有限且为正
+  function safeStep(range, target) {
+    var s = niceStep(range, target);
+    if (!isFinite(s) || s <= 0) return 0;
+    return s;
+  }
+  function render(built) {
+    var host = $('#chart');
+    while (host.firstChild) host.removeChild(host.firstChild);
+
+    var W = Math.max(420, Math.min(state.maxW || 620, (host.clientWidth || 820) * 0.94));
+    // 空状态：还没有选物质时，只显示提示，不画任何曲线
+    if (!built.series.length) {
+      var H0 = 420;
+      var svg0 = el('svg', { xmlns: NS, viewBox: '0 0 ' + W + ' ' + H0, width: W, height: H0, 'font-family': '"Microsoft YaHei","PingFang SC",system-ui,sans-serif' });
+      svg0.style.width = W + 'px'; svg0.style.maxWidth = '100%'; svg0.style.height = 'auto';
+      svg0.appendChild(el('rect', { x: 0, y: 0, width: W, height: H0, fill: '#fff' }));
+      var hidAll = !!(built.all && built.all.length);
+      var msg1 = hidAll ? '当前所有曲线都被隐藏了' : '请在左侧「物质」中选择要画的体系';
+      var msg2 = hidAll ? '在左侧「显示哪几条」里重新勾选' : '或从上方「快速开始」选一个预设场景';
+      svg0.appendChild(el('text', { x: W / 2, y: H0 / 2 - 8, 'text-anchor': 'middle', 'font-size': 15, fill: '#8b95a3' }, msg1));
+      svg0.appendChild(el('text', { x: W / 2, y: H0 / 2 + 20, 'text-anchor': 'middle', 'font-size': 12.5, fill: '#b6c1d0' }, msg2));
+      host.appendChild(svg0);
+      last = { svg: svg0, W: W, H: H0, series: [], xLog: false };
+      return;
+    }
+
+    var AR = { '4:3': 4 / 3, '3:2': 3 / 2, '1:1': 1, '16:9': 16 / 9 };
+    var H = Math.round(Math.min(760, Math.max(320, W / (AR[state.aspect] || 4 / 3))));
+    var hasR = !!built.y2q;
+    var mL = 74, mR = hasR ? 90 : 30;
+    var maxLW = W - mL - mR;
+    // 先算出图例要占几行，再决定上边距，避免图例与曲线/关键点标签重叠
+    var legendRows = 1, accW = 0;
+    built.series.forEach(function (s) {
+      var lw = s.label.length * 7.4 + 30;
+      if (accW + lw > maxLW) { legendRows++; accW = lw; } else { accW += lw; }
+    });
+    var m = { l: mL, r: mR, t: 18 + legendRows * 17 + 20, b: 72 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b, iwr = iw;
+
+    var xQ = built.xq, y1Q = built.y1q, y2Q = built.y2q;
+    var xLog = !!xQ.log, y1Log = !!y1Q.log, y2Log = y2Q ? !!y2Q.log : false;
+
+    var left = built.series.filter(function (s) { return s.axis === 'left'; });
+    var right = built.series.filter(function (s) { return s.axis === 'right'; });
+
+    // 量程优先级：手动输入 > 场景给的建议窗口 > 量的固定范围 > 自动
+    function manual(lo, hi) {
+      return (lo !== null && lo !== undefined && hi !== null && hi !== undefined &&
+        isFinite(lo) && isFinite(hi) && hi > lo) ? { min: lo, max: hi } : null;
+    }
+    var xr = manual(state.axes.xmin, state.axes.xmax) || (built.win && built.win.x) || xQ.fixed ||
+      autoRange(built.series.flatMap(function (s) { return s.pts.map(function (p) { return p.x; }); }), xLog);
+    var y1r = manual(state.axes.y1min, state.axes.y1max) || (built.win && built.win.y) || y1Q.fixed ||
+      autoRange(left.flatMap(function (s) { return s.pts.map(function (p) { return p.y; }); }), y1Log);
+    var y2r = y2Q ? (y2Q.fixed || autoRange(right.flatMap(function (s) { return s.pts.map(function (p) { return p.y; }); }), y2Log)) : null;
+
+    function mk(min, max, log, p0, p1, rev) {
+      if (rev) { var t0 = p0; p0 = p1; p1 = t0; }
+      if (!log) return function (v) { return p0 + (v - min) / (max - min) * (p1 - p0); };
+      var lo = Math.pow(10, min), hi = Math.pow(10, max);
+      return function (v) { return p0 + (Math.log10(clamp(v, lo, hi)) - min) / (max - min) * (p1 - p0); };
+    }
+    var X = mk(xr.min, xr.max, xLog, m.l, m.l + iwr, built.revX);
+    // 纵轴：最小值在下（m.t+ih），最大值在上（m.t）
+    var Y1 = mk(y1r.min, y1r.max, y1Log, m.t + ih, m.t, built.revY);
+    var Y2 = y2r ? mk(y2r.min, y2r.max, y2Log, m.t + ih, m.t, built.revY2) : null;
+    function Yof(s, v) { return s.axis === 'right' ? Y2(v) : Y1(v); }
+
+    var svg = el('svg', { xmlns: NS, viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, 'font-family': '"Microsoft YaHei","PingFang SC",system-ui,sans-serif' });
+    svg.style.width = W + 'px'; svg.style.maxWidth = '100%'; svg.style.height = 'auto';
+    svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff' }));
+
+    // 网格
+    if (!xLog) {
+      var sx = safeStep(xr.max - xr.min, 7);
+      if (sx > 0)
+      for (var xv = Math.ceil(xr.min / sx) * sx, xc = 0; xc < 1500 && xv <= xr.max + sx * 0.5; xv += sx, xc++) {
+        svg.appendChild(el('line', { x1: X(xv), y1: m.t, x2: X(xv), y2: m.t + ih, stroke: '#eef1f6' }));
+        svg.appendChild(el('text', { x: X(xv), y: m.t + ih + 20, 'text-anchor': 'middle', 'font-size': 11.5, fill: '#6b7787' }, fmtTick(xv, sx)));
+      }
+    } else {
+      // 对数轴：刻度线全画，标签按可用像素抽稀，避免 1.0E-12 这种长标签重叠
+      var fmtW = (state.tickFmt === 'sup') ? 26 : (state.tickFmt === 'e' ? 34 : 46);
+      var pxPerDecX = iwr / Math.max(1e-6, (xr.max - xr.min));
+      var everyX = Math.max(1, Math.ceil(fmtW / Math.max(1e-6, pxPerDecX)));
+      for (var d1 = Math.ceil(xr.min); d1 <= xr.max; d1++) {
+        var xp = X(Math.pow(10, d1));
+        svg.appendChild(el('line', { x1: xp, y1: m.t, x2: xp, y2: m.t + ih, stroke: '#eef1f6' }));
+        if (d1 % everyX === 0) svg.appendChild(el('text', { x: xp, y: m.t + ih + 20, 'text-anchor': 'middle', 'font-size': 11.5, fill: '#6b7787' }, fmtLogTick(d1)));
+      }
+    }
+    // 左轴
+    if (!y1Log) {
+      var s1 = safeStep(y1r.max - y1r.min, 6);
+      if (s1 > 0)
+      for (var v1 = Math.ceil(y1r.min / s1) * s1, yc1 = 0; yc1 < 1500 && v1 <= y1r.max + s1 * 0.5; v1 += s1, yc1++) {
+        var py1 = Y1(v1);
+        svg.appendChild(el('line', { x1: m.l, y1: py1, x2: m.l + iwr, y2: py1, stroke: '#eef1f6' }));
+        svg.appendChild(el('text', { x: m.l - 10, y: py1 + 4, 'text-anchor': 'end', 'font-size': 11.5, fill: '#6b7787' }, fmtTick(v1, s1)));
+      }
+    } else {
+      var pxPerDecY = ih / Math.max(1e-6, (y1r.max - y1r.min));
+      var everyY = Math.max(1, Math.ceil(14 / Math.max(1e-6, pxPerDecY)));
+      for (var d2 = Math.ceil(y1r.min); d2 <= y1r.max; d2++) {
+        var py2 = Y1(Math.pow(10, d2));
+        svg.appendChild(el('line', { x1: m.l, y1: py2, x2: m.l + iwr, y2: py2, stroke: '#eef1f6' }));
+        if (d2 % everyY === 0) svg.appendChild(el('text', { x: m.l - 10, y: py2 + 4, 'text-anchor': 'end', 'font-size': 11.5, fill: '#6b7787' }, fmtLogTick(d2)));
+      }
+    }
+    // 右轴
+    if (y2r) {
+      if (!y2Log) {
+        var s2 = safeStep(y2r.max - y2r.min, 5);
+      if (s2 > 0)
+        for (var v2 = Math.ceil(y2r.min / s2) * s2, yc2 = 0; yc2 < 1500 && v2 <= y2r.max + s2 * 0.5; v2 += s2, yc2++) {
+          svg.appendChild(el('text', { x: m.l + iwr + 10, y: Y2(v2) + 4, 'text-anchor': 'start', 'font-size': 11.5, fill: '#94a3b8' }, fmtTick(v2, s2)));
+        }
+      } else {
+        for (var d3 = Math.ceil(y2r.min); d3 <= y2r.max; d3++) {
+          svg.appendChild(el('text', { x: m.l + iwr + 10, y: Y2(Math.pow(10, d3)) + 4, 'text-anchor': 'start', 'font-size': 11.5, fill: '#94a3b8' }, fmtLogTick(d3)));
+        }
+      }
+      svg.appendChild(el('line', { x1: m.l + iwr, y1: m.t, x2: m.l + iwr, y2: m.t + ih, stroke: '#cbd5e1' }));
+      svg.appendChild(el('text', {
+        x: W - 14, y: m.t + ih / 2, 'text-anchor': 'middle', 'font-size': 12, fill: '#94a3b8', 'font-weight': 600,
+        transform: 'rotate(90 ' + (W - 14) + ' ' + (m.t + ih / 2) + ')'
+      }, (built.y2Title || y2Q.label)));
+    }
+
+    // 坐标轴
+    svg.appendChild(el('line', { x1: m.l, y1: m.t, x2: m.l, y2: m.t + ih, stroke: '#c8d0dc' }));
+    svg.appendChild(el('line', { x1: m.l, y1: m.t + ih, x2: m.l + iwr, y2: m.t + ih, stroke: '#c8d0dc' }));
+    svg.appendChild(el('text', { x: m.l + iwr / 2, y: m.t + ih + 44, 'text-anchor': 'middle', 'font-size': 12.5, fill: '#3b4757', 'font-weight': 600 }, (built.xTitle || xQ.label)));
+    svg.appendChild(el('text', {
+      x: 16, y: m.t + ih / 2, 'text-anchor': 'middle', 'font-size': 12.5, fill: '#3b4757', 'font-weight': 600,
+      transform: 'rotate(-90 16 ' + (m.t + ih / 2) + ')'
+    }, (built.y1Title || y1Q.label)));
+
+    // c(M)=c(A) 辅助线（仅当两轴属于同一族时）
+    if (built.diag && !xLog && !y1Log) {
+      var d0 = Math.max(xr.min, y1r.min), d1 = Math.min(xr.max, y1r.max);
+      if (d1 > d0) {
+        svg.appendChild(el('line', {
+          x1: X(d0), y1: Y1(d0), x2: X(d1), y2: Y1(d1),
+          stroke: '#94a3b8', 'stroke-width': 1.3, 'stroke-dasharray': '6 5'
+        }));
+      }
+    }
+
+    // 曲线
+    built.series.forEach(function (s) {
+      var d = '';
+      for (var i = 0; i < s.pts.length; i++) {
+        var p = s.pts[i];
+        if (!isFinite(p.y)) continue;
+        d += (d ? 'L' : 'M') + X(p.x).toFixed(2) + ' ' + Yof(s, p.y).toFixed(2);
+      }
+      var attrs = { d: d, fill: 'none', stroke: s.color, 'stroke-width': 2.1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+      if (s.dash) attrs['stroke-dasharray'] = s.dash;
+      svg.appendChild(el('path', attrs));
+    });
+
+    // 曲线末端直接标注（曲线不多时）
+    if (built.endLabels && built.series.length <= 9) {
+      built.series.forEach(function (s) {
+        var lastP = null;
+        for (var i = s.pts.length - 1; i >= 0; i--) { if (isFinite(s.pts[i].y)) { lastP = s.pts[i]; break; } }
+        if (!lastP) return;
+        var px = X(lastP.x), py = Yof(s, lastP.y);
+        if (px > m.l + iwr - 4) return;
+        svg.appendChild(el('text', { x: px + 6, y: py + 4, 'font-size': 11, fill: s.color }, s.label.replace(/^lg c\((.*)\)$/, '$1')));
+      });
+    }
+
+    // 交点圆环
+    (built.inter || []).forEach(function (p) {
+      svg.appendChild(el('circle', {
+        cx: X(p.x), cy: Y1(p.y), r: 4.6, fill: '#fff', stroke: '#334155',
+        'stroke-width': 1.5, 'stroke-opacity': .5
+      }));
+    });
+
+    // 选点竖线
+    if (built.pickX !== null && built.pickX !== undefined) {
+      var pxs = X(built.pickX);
+      svg.appendChild(el('line', {
+        x1: pxs, y1: m.t, x2: pxs, y2: m.t + ih,
+        stroke: '#0f172a', 'stroke-width': 1, 'stroke-dasharray': '6 4', opacity: .45
+      }));
+    }
+
+    // 关键点
+    (built.marks || []).forEach(function (k, i) {
+      var xp = X(k.x);
+      if (xp < m.l - 1 || xp > m.l + iwr + 1) return;
+      svg.appendChild(el('line', { x1: xp, y1: m.t, x2: xp, y2: m.t + ih, stroke: k.color || '#94a3b8', 'stroke-dasharray': '4 4', opacity: .75 }));
+      svg.appendChild(el('text', { x: xp + 4, y: m.t - 6 - (i % 2) * 13, 'font-size': 10.5, fill: '#7a8798' }, k.label));
+      if (k.y !== null && isFinite(k.y)) {
+        svg.appendChild(el('circle', { cx: xp, cy: Y1(k.y), r: 4.5, fill: '#fff', stroke: k.color || '#dc2626', 'stroke-width': 2 }));
+      }
+    });
+
+    // 图例
+    var lx = m.l, ly = 18, lh = 17, maxW = W - m.l - m.r;
+    built.series.forEach(function (s) {
+      var lab = s.label + (s.axis === 'right' ? ' ▸' : '');
+      var lw = lab.length * 7.2 + 30;
+      if (lx + lw > m.l + maxW) { lx = m.l; ly += lh; }
+      svg.appendChild(el('line', { x1: lx, y1: ly, x2: lx + 15, y2: ly, stroke: s.color, 'stroke-width': 2.6, 'stroke-linecap': 'round' }));
+      svg.appendChild(el('text', { x: lx + 20, y: ly + 4, 'font-size': 11.5, fill: '#2b3644' }, lab));
+      lx += lw;
+    });
+
+    if (state.caption) svg.appendChild(el('text', { x: m.l, y: H - 10, 'font-size': 10.5, fill: '#8b95a3' }, scene.caption));
+
+    // hover
+    var cross = el('line', { x1: 0, y1: m.t, x2: 0, y2: m.t + ih, stroke: '#b6c1d0', 'stroke-dasharray': '3 3', opacity: 0 });
+    svg.appendChild(cross);
+    var dots = built.series.map(function (s) {
+      var c = el('circle', { r: 3.4, fill: '#fff', stroke: s.color, 'stroke-width': 2, opacity: 0 });
+      svg.appendChild(c); return c;
+    });
+    svg.appendChild(el('rect', { x: m.l, y: m.t, width: iwr, height: ih, fill: 'transparent' }));
+
+    host.appendChild(svg);
+    var tip = document.createElement('div'); tip.className = 'tip'; host.appendChild(tip);
+    last = { svg: svg, W: W, H: H, series: built.series, xLog: xLog };
+
+    function move(ev) {
+      var r = svg.getBoundingClientRect();
+      var px = (ev.clientX - r.left) / r.width * W, py = (ev.clientY - r.top) / r.height * H;
+      if (px < m.l || px > m.l + iwr || py < m.t || py > m.t + ih) { hide(); return; }
+      // 找屏幕距离最近的采样点
+      var best = null, bd = Infinity;
+      built.series.forEach(function (s, si) {
+        s.pts.forEach(function (p) {
+          if (!isFinite(p.y)) return;
+          var dx = X(p.x) - px, dy = Yof(s, p.y) - py, d = dx * dx + dy * dy;
+          if (d < bd) { bd = d; best = { s: s, p: p, si: si }; }
+        });
+      });
+      if (!best) { hide(); return; }
+      var x0 = best.p.x, xp = X(x0);
+      cross.setAttribute('x1', xp); cross.setAttribute('x2', xp); cross.setAttribute('opacity', 1);
+      var html = '<div><span class="k">' + xQ.label + '</span>' + fmt(x0, 2) + '</div>';
+      built.series.forEach(function (s, i) {
+        var near = s.pts.reduce(function (b, p) { return Math.abs(p.x - x0) < Math.abs(b.x - x0) ? p : b; }, s.pts[0]);
+        if (!isFinite(near.y)) { dots[i].setAttribute('opacity', 0); return; }
+        dots[i].setAttribute('cx', X(near.x)); dots[i].setAttribute('cy', Yof(s, near.y)); dots[i].setAttribute('opacity', 1);
+        html += '<div><span class="k" style="color:' + s.color + '">' + s.label + '</span>' + fmt(near.y, 2) + '</div>';
+      });
+      tip.innerHTML = built.series.length >= 5 ? '<div class="col">' + html + '</div>' : html;
+      tip.classList.add('on');
+      var tw = tip.offsetWidth || 170, th = tip.offsetHeight || 60;
+      var left = px / W * r.width - tw / 2;
+      left = Math.max(6, Math.min(r.width - tw - 6, left));
+      var top = py / H * r.height - th - 14;
+      if (top < 6) top = py / H * r.height + 18;
+      if (top + th > r.height - 4) top = Math.max(6, r.height - th - 4);
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+    }
+    function hide() {
+      cross.setAttribute('opacity', 0);
+      dots.forEach(function (d) { d.setAttribute('opacity', 0); });
+      tip.classList.remove('on');
+    }
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', hide);
+    svg.addEventListener('touchmove', function (e) { if (e.touches[0]) move(e.touches[0]); }, { passive: true });
+
+    // 点击交点 → 弹出可拖拽坐标标签
+    var bubble = null;
+    function shortLab(l) { return l.replace(/^lg c\((.*)\)$/, '$1'); }
+    function showBubble(p) {
+      if (bubble) { bubble.remove(); bubble = null; }
+      var lines = [
+        'c(' + shortLab(p.aLabel) + ') = c(' + shortLab(p.bLabel) + ')',
+        '(' + fmtSci(Math.pow(10, p.x)) + ', ' + fmtSci(Math.pow(10, p.y)) + ')'
+      ];
+      var w = Math.max(lines[0].length, lines[1].length) * 7.8 + 28, h = 52;
+      var g = el('g', { transform: 'translate(' + X(p.x) + ',' + Y1(p.y) + ')' });
+      g.style.cursor = 'move';
+      g.appendChild(el('line', { x1: 0, y1: 0, x2: 12, y2: -h - 6, stroke: '#94a3b8', 'stroke-width': 1 }));
+      g.appendChild(el('rect', { x: 12, y: -h - 14, width: w, height: h, rx: 9, fill: '#fff', stroke: '#94a3b8', 'stroke-width': 1.2 }));
+      lines.forEach(function (t, i) {
+        g.appendChild(el('text', { x: 24, y: -h + 3 + i * 20, 'font-size': 12.5, fill: '#1b2430' }, t));
+      });
+      svg.appendChild(g);
+      bubble = g;
+      var sx = 0, sy = 0, ox = 0, oy = 0, dragging = false, k = 1;
+      g.addEventListener('pointerdown', function (e) {
+        dragging = true; sx = e.clientX; sy = e.clientY;
+        k = W / svg.getBoundingClientRect().width;
+        if (g.setPointerCapture) g.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+      });
+      g.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        ox += (e.clientX - sx) * k; oy += (e.clientY - sy) * k;
+        sx = e.clientX; sy = e.clientY;
+        g.setAttribute('transform', 'translate(' + (X(p.x) + ox) + ',' + (Y1(p.y) + oy) + ')');
+      });
+      g.addEventListener('pointerup', function () { dragging = false; });
+    }
+    svg.addEventListener('click', function (ev) {
+      if (!built.inter || !built.inter.length) return;
+      var r = svg.getBoundingClientRect();
+      var px = (ev.clientX - r.left) / r.width * W, py = (ev.clientY - r.top) / r.height * H;
+      var best = null, bd = 15;
+      built.inter.forEach(function (p) {
+        var dx = X(p.x) - px, dy = Y1(p.y) - py, dd = Math.sqrt(dx * dx + dy * dy);
+        if (dd < bd) { bd = dd; best = p; }
+      });
+      if (best) showBubble(best);
+    });
+
+    return { xr: xr, y1r: y1r, y2r: y2r, X: X, Y1: Y1, Y2: Y2, m: m, iwr: iwr };
+  }
+
+  /* ================= 轴选项与界面 ================= */
+
+  function fillAxisSelects() {
+    var groups = ['基本', '比值', '整组', '单值'];
+    var xSel = $('#axX'), y1Sel = $('#axY1'), y2Sel = $('#axY2');
+    [xSel, y1Sel, y2Sel].forEach(function (sel) { while (sel.firstChild) sel.removeChild(sel.firstChild); });
+
+    groups.forEach(function (g) {
+      var qs = scene.quantities.filter(function (q) { return (q.group || '基本') === g; });
+      if (!qs.length) return;
+      // 三个轴都允许选整组（family），横轴同样支持
+      [[xSel, true], [y1Sel, true], [y2Sel, true]].forEach(function (pair) {
+        var sel = pair[0], allowFamily = pair[1];
+        var og = document.createElement('optgroup'); og.label = g;
+        qs.forEach(function (q) {
+          if (!allowFamily && q.kind === 'family') return;
+          var o = document.createElement('option');
+          o.value = q.id;
+          o.textContent = q.label + (q.kind === 'family' ? '（多条）' : '');
+          og.appendChild(o);
+        });
+        if (og.children.length) sel.appendChild(og);
+      });
+    });
+  }
+
+  function renderParams() {
+    var box = $('#params');
+    while (box.firstChild) box.removeChild(box.firstChild);
+    scene.paramDefs.forEach(function (d) {
+      var g = document.createElement('div'); g.className = 'group';
+      if (d.type === 'select') {
+        var lb = document.createElement('label'); lb.textContent = d.label;
+        var sel = document.createElement('select');
+        var groupsSeen = {};
+        d.options.forEach(function (o) {
+          var parent = sel;
+          if (o.group) {
+            if (!groupsSeen[o.group]) {
+              var og = document.createElement('optgroup'); og.label = o.group;
+              sel.appendChild(og); groupsSeen[o.group] = og;
+            }
+            parent = groupsSeen[o.group];
+          }
+          var op = document.createElement('option'); op.value = o.value; op.textContent = o.label;
+          parent.appendChild(op);
+        });
+        sel.value = d.value;
+        sel.onchange = function () { onParam(d.id, this.value); };
+        g.appendChild(lb); g.appendChild(sel);
+      } else if (d.type === 'number') {
+        var lb2 = document.createElement('label'); lb2.textContent = d.label;
+        var r = document.createElement('div'); r.className = 'row';
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.value = d.value; inp.step = d.step || 0.01; inp.min = d.min || 0;
+        inp.onchange = function () {
+          var v = parseFloat(this.value);
+          if (!isFinite(v)) { this.value = d.value; return; }
+          if (d.min !== undefined && d.min !== null && v < d.min) v = d.min;
+          onParam(d.id, v);
+        };
+        r.appendChild(inp);
+        if (d.unit) { var u = document.createElement('span'); u.className = 'hint'; u.textContent = d.unit; r.appendChild(u); }
+        g.appendChild(lb2); g.appendChild(r);
+      } else if (d.type === 'range') {
+        var lb3 = document.createElement('label');
+        lb3.innerHTML = d.label + ' <span style="color:var(--accent);font-weight:700">' + d.value + ' ' + (d.unit || '') + '</span>';
+        var rg = document.createElement('input');
+        rg.type = 'range'; rg.min = d.min; rg.max = d.max; rg.step = 1; rg.value = d.value;
+        rg.oninput = function () {
+          lb3.innerHTML = d.label + ' <span style="color:var(--accent);font-weight:700">' + this.value + ' ' + (d.unit || '') + '</span>';
+          onParam(d.id, parseFloat(this.value), true);
+        };
+        rg.onchange = function () { onParam(d.id, parseFloat(this.value)); };
+        g.appendChild(lb3); g.appendChild(rg);
+      } else if (d.type === 'comps') {
+        var lbc = document.createElement('label'); lbc.textContent = d.label + '（数字＝摩尔比，可改）';
+        var rc = document.createElement('div'); rc.className = 'row';
+        var selc = document.createElement('select');
+        Object.keys(DATA.compounds).forEach(function (k) {
+          var o = document.createElement('option'); o.value = k;
+          o.textContent = (DATA.compounds[k].name || k) + ' ' + k;
+          selc.appendChild(o);
+        });
+        var btnc = document.createElement('button'); btnc.className = 'btn'; btnc.textContent = '添加';
+        btnc.onclick = function () { onParam('comps', { add: selc.value }); };
+        rc.appendChild(selc); rc.appendChild(btnc);
+        g.appendChild(lbc); g.appendChild(rc);
+        d.value.forEach(function (cp, idx) {
+          var row = document.createElement('div'); row.className = 'row';
+          var nm = document.createElement('span');
+          nm.style.cssText = 'flex:1;font-size:12.5px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+          nm.textContent = (DATA.compounds[cp.key] && DATA.compounds[cp.key].name) || cp.key;
+          var ri = document.createElement('input');
+          ri.type = 'number'; ri.value = cp.ratio; ri.step = 0.1; ri.min = 0.01;
+          ri.style.flex = '0 0 76px';
+          ri.title = '摩尔比（可修改，改完自动重算）';
+          ri.onchange = function () { onParam('comps', { ratio: { idx: idx, v: parseFloat(this.value) } }); };
+          var xb = document.createElement('button'); xb.className = 'btn'; xb.innerHTML = '×';
+          xb.style.padding = '0 10px';
+          xb.onclick = function () { onParam('comps', { remove: cp.key }); };
+          row.appendChild(nm); row.appendChild(ri); row.appendChild(xb);
+          g.appendChild(row);
+        });
+        var hintc = document.createElement('div');
+        hintc.className = 'hint';
+        hintc.style.marginTop = '4px';
+        hintc.textContent = '「添加」把物质加进来；每行右侧的数字是它们之间的摩尔比，可直接改（如 HAc : NaAc = 1 : 1）。比例只决定怎么配，浓度扫描由下面「总浓度 10^」控制。';
+        var hintc2 = document.createElement('div');
+        hintc2.className = 'hint';
+        hintc2.style.marginTop = '2px';
+        hintc2.textContent = '横轴「总浓度」＝各组分形式浓度之和（不是某个离子的浓度）。沿横轴移动，相当于把同一配比的溶液配成从稀到浓的一系列溶液，每个点单独解一次平衡。';
+        g.appendChild(hintc2);
+        g.appendChild(hintc);
+      } else if (d.type === 'keys') {
+        var lbk = document.createElement('label'); lbk.textContent = d.label;
+        var rk = document.createElement('div'); rk.className = 'row';
+        var selk = document.createElement('select');
+        var seen = {};
+        d.options.forEach(function (o) {
+          if (!seen[o.group]) {
+            var og = document.createElement('optgroup'); og.label = o.group;
+            selk.appendChild(og); seen[o.group] = og;
+          }
+          var op = document.createElement('option'); op.value = o.key; op.textContent = o.name + ' ' + o.formula;
+          seen[o.group].appendChild(op);
+        });
+        var btnk = document.createElement('button'); btnk.className = 'btn'; btnk.textContent = '添加';
+        btnk.onclick = function () { onParam('keys', { add: selk.value }); };
+        rk.appendChild(selk); rk.appendChild(btnk);
+        var chips = document.createElement('div'); chips.className = 'chips';
+        d.value.forEach(function (k) {
+          var c = document.createElement('span'); c.className = 'chip';
+          var dot = document.createElement('i'); dot.style.background = '#2563eb';
+          var b = document.createElement('b'); b.textContent = spOf(k).name;
+          var x = document.createElement('button'); x.innerHTML = '×';
+          x.onclick = function () { onParam('keys', { remove: k }); };
+          c.appendChild(dot); c.appendChild(b); c.appendChild(x);
+          chips.appendChild(c);
+        });
+        g.appendChild(lbk); g.appendChild(rk); g.appendChild(chips);
+      } else if (d.type === 'multi') {
+        var lb4 = document.createElement('label'); lb4.textContent = d.label;
+        g.appendChild(lb4);
+        d.options.forEach(function (o) {
+          var l = document.createElement('label'); l.className = 'chk';
+          var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = o.checked;
+          cb.onchange = function () { onParam(d.id, { value: o.value, checked: this.checked }); };
+          var s = document.createElement('span'); s.textContent = o.label;
+          l.appendChild(cb); l.appendChild(s); g.appendChild(l);
+        });
+      }
+      box.appendChild(g);
+    });
+    if (scene.notes) {
+      var n = document.createElement('div'); n.className = 'hint'; n.textContent = scene.notes;
+      box.appendChild(n);
+    }
+  }
+
+  function onParam(id, val, live) {
+    var p = state[state.scenario];
+    function apply() { if (live) { scene = buildScene(); redraw(); } else initScene(true); }
+    if (id === 'system') {
+      p.system = val;
+      if (p.sweep !== 'pH' && p.sweep !== 'n' && p.sweep !== 'lg') p.sweep = 'pH';
+      initScene(false);
+      return;
+    }
+    if (id === 'saltkey') {
+      p.keys = [val];
+      apply();
+      return;
+    }
+    if (id === 'comps') {
+      if (val.add) {
+        if (!p.comps.some(function (c) { return c.key === val.add; })) p.comps.push({ key: val.add, ratio: 1 });
+      } else if (val.remove) {
+        if (p.comps.length > 1) p.comps = p.comps.filter(function (c) { return c.key !== val.remove; });
+      } else if (val.ratio) {
+        var t = p.comps[val.ratio.idx];
+        if (t && val.ratio.v > 0) t.ratio = val.ratio.v;
+      }
+      p.pick = null;
+      apply();
+      return;
+    }
+    if (id === 'emin' || id === 'emax') {
+      var e = Math.round(val);
+      if (!isFinite(e)) return;
+      if (id === 'emin') p.cMin = Math.pow(10, Math.min(e, Math.round(Math.log10(p.cMax)) - 1));
+      else p.cMax = Math.pow(10, Math.max(e, Math.round(Math.log10(p.cMin)) + 1));
+      p.pick = null;
+      apply();
+      return;
+    }
+    if (id === 'keys') {
+      if (val.remove) {
+        p.keys = (p.keys || []).filter(function (k) { return k !== val.remove; });
+      } else if (val.add && (p.keys || []).indexOf(val.add) < 0) {
+        p.keys = (p.keys || []).concat([val.add]);
+        // 强酸/强碱/纯水没有酸根物种，δ 图会空白，自动切到 lg c
+        var hasAcid = p.keys.some(function (kk) {
+          var cpd = DATA.compounds[kk];
+          return cpd && cpd.groups && Object.keys(cpd.groups).length > 0;
+        });
+        if (!hasAcid && state.axes.y1 === 'delta') state.axes.y1 = 'lgc';
+      }
+      apply();
+      return;
+    }
+    if (id === 'ptsalt') {
+      if (val.checked) { if (p.salts.indexOf(val.value) < 0) p.salts.push(val.value); }
+      else p.salts = p.salts.filter(function (k) { return k !== val.value; });
+      if (!p.salts.length) p.salts = ['AgCl'];
+      apply();
+      return;
+    }
+    if (id === 'salt') {
+      if (val.checked) { if (p.salts.indexOf(val.value) < 0) p.salts.push(val.value); }
+      else { p.salts = p.salts.filter(function (k) { return k !== val.value; }); }
+      if (!p.salts.length) p.salts = ['Fe(OH)3'];
+      // 选了非氢氧化物但还在 pH 模式：自动切到 c(沉淀剂) 模式，否则曲线无意义
+      var chosen = DATA.salts[val.value];
+      if (val.checked && chosen && chosen.anion !== 'OH-' && p.sweep === 'pH') p.sweep = 'lgA';
+    } else if (id === 'key' && state.scenario === 'tit' && STRONG_BASES[val]) {
+      p.key = val; p.titrant = 'acid';
+    } else if (id === 'sweep' && state.scenario === 'precip') {
+      p.sweep = val;
+      p.salts = val === 'pH' ? ['Fe(OH)3'] : ['CdS'];
+    } else {
+      p[id] = val;
+    }
+    apply();
+  }
+
+  // 沉淀场景：多盐对比时线性 c 轴没有共同量程（不同盐溶解度可差十几数量级），
+  // 只要任一轴是 c/p 型就强制退回 lg 轴，并在状态栏说明原因
+  function fixPrecipAxes() {
+    // 只提示、不抢用户的轴选择：c 轴在多盐时按最大溶解度定标
+    if (state.scenario !== 'precip') { state.notice = ''; return; }
+    var n = (state.precip.salts || []).length;
+    var cx = ['cA', 'cM'].indexOf(state.axes.x) >= 0 || ['cA', 'cM'].indexOf(state.axes.y1) >= 0;
+    state.notice = (n > 1 && cx)
+      ? '已选 ' + n + ' 种盐：c 轴按最大溶解度定标，溶解度小得多的曲线会贴轴（要看清某一种，请只勾它，或用 lg 轴）'
+      : '';
+  }
+
+  // 每个场景一句话说明：这个图画的是什么
+  var SCENE_DESC = {
+    aq: '横轴 pH（0~14），纵轴分布分数 δ 或各微粒浓度。看酸/碱/盐随 pH 改变的物种分布。',
+    dil: '横轴稀释倍数 n（可选 lg n），纵轴 pH。看同一份溶液不断稀释时 pH 怎么变。',
+    types: '横轴是这瓶溶液的总浓度（各组分形式浓度之和，对数），左轴各微粒平衡浓度（对数），右轴 pH。九类溶液各自的稀释系列。',
+    mix: '先选几种物质并设定摩尔比（如 HAc : NaAc = 1 : 1 配成缓冲液），再用横轴表示这瓶液的总浓度（各组分形式浓度之和），纵轴是各微粒的平衡浓度。看同一配比在不同浓度下的微粒分布。',
+    tit: '横轴滴定剂体积 V，纵轴 pH（可加电导率 κ、分布分数 δ）。看等当点突跃。',
+    feed: '横轴投料比 r = n(分子)/n(分母)，纵轴 pH。看酸过量→中和→碱过量的全过程。',
+    precip: '横轴 pH 或 lg c(沉淀剂)，纵轴金属离子浓度。对应溶度积与同离子效应。',
+    ptit: '横轴 AgNO₃ 体积 V，纵轴各卤素离子的 pX。看分步沉淀谁先出现。',
+    temp: '横轴温度 T，纵轴 pH。考查 Kw 与 Ka/Kb 随温度的变化。',
+    cr: '横轴稀释倍数，纵轴 pH 与含铬物种浓度。K₂Cr₂O₇ 稀释时的平衡移动。'
+  };
+  // 按场景显示/隐藏左栏卡片，避免无关控件干扰
+  function applyCards(sc) {
+    var c = (sc && sc.cards) || {};
+    function set(id, show) {
+      var n = document.querySelector('#' + id);
+      if (n) n.style.display = show ? '' : 'none';
+    }
+    set('cardOverlay', c.overlay !== false);
+    // 只有存在整组量（一次出多条曲线）时，「显示哪几条」才有意义
+    var hasFam = !!(sc && sc.quantities && sc.quantities.some(function (q) { return q.kind === 'family'; }));
+    set('cardPick', hasFam && c.pick !== false);
+    set('rowDiag45', c.diag45 === true);
+    var d = document.querySelector('#sceneDesc');
+    if (d) d.textContent = SCENE_DESC[state.scenario] || '';
+  }
+
+  function defaultAxesFor(id) {
+    if (id === 'types') return { x: 'ctot', y1: 'c', y2: 'pH', useY2: true, revX: false, revY: false, revY2: false, xmin: null, xmax: null, y1min: null, y1max: null };
+    return { x: '__sweep', y1: null, y2: null, useY2: false, xmin: null, xmax: null, y1min: null, y1max: null };
+  }
+
+  // 底部标签页：九类溶液，点击即切到「溶液类型」场景
+  function renderTabs() {
+    var box = document.querySelector('#clsTabs');
+    if (!box) return;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    var inTypes = state.scenario === 'types';
+    var strip = document.querySelector('#clsTabs');
+    if (strip) strip.style.display = inTypes ? '' : 'none';
+    if (!inTypes) { while (box.firstChild) box.removeChild(box.firstChild); return; }
+    var active = inTypes ? state.types.cls : null;
+    TYPE_CLASSES.forEach(function (t) {
+      var b = document.createElement('button');
+      b.className = 'btn sm' + (t.key === active ? ' primary' : '');
+      b.textContent = t.label;
+      b.title = t.hint + '（需要 ' + t.need + ' 元酸）';
+      b.style.flex = '1 1 auto';
+      b.onclick = function () {
+        state.scenario = 'types';
+        state.types.cls = t.key;
+        document.querySelector('#scenario').value = 'types';
+        state.overlays = [];
+        state.hidden = {};
+        state.axes = defaultAxesFor('types');
+        initScene(false);
+      };
+      box.appendChild(b);
+    });
+  }
+
+  function initScene(keepAxes) {
+    scene = buildScene();
+    applyCards(scene);
+    fixPrecipAxes();
+    renderParams();
+    fillAxisSelects();
+    var ids = scene.quantities.map(function (q) { return q.id; });
+    if (ids.indexOf(state.axes.x) < 0) state.axes.x = '__sweep';
+    if (ids.indexOf(state.axes.y1) < 0) state.axes.y1 = defaultY1();
+    if (state.axes.y2 && ids.indexOf(state.axes.y2) < 0) { state.axes.y2 = null; state.axes.useY2 = false; }
+    $('#axX').value = state.axes.x;
+    $('#axY1').value = state.axes.y1;
+    if (state.axes.y2) $('#axY2').value = state.axes.y2;
+    $('#useY2').checked = state.axes.useY2;
+    $('#axY2').disabled = !state.axes.useY2;
+    renderTabs();
+    ['xmin','xmax','ymin','ymax'].forEach(function (id) {
+      var el3 = $('#' + id);
+      if (!el3) return;
+      var k = id === 'ymin' ? 'y1min' : (id === 'ymax' ? 'y1max' : id);
+      el3.value = state.axes[k] === null || state.axes[k] === undefined ? '' : String(state.axes[k]);
+    });
+    $('#revX').checked = !!state.axes.revX;
+    $('#revY').checked = !!state.axes.revY;
+    $('#revY2').checked = !!state.axes.revY2;
+    redraw();
+  }
+
+  function activitySupported() {
+    return ['aq', 'dil', 'mix', 'tit', 'temp'].indexOf(state.scenario) >= 0;
+  }
+
+  function defaultY1() {
+    if (state.scenario === 'tit' || state.scenario === 'temp') return 'pH';
+    if (state.scenario === 'precip') return 'lgM';
+    if (state.scenario === 'ptit') return 'pX';
+    if (state.scenario === 'cr') return 'pH';
+    if (state.scenario === 'dil') return 'pH';
+    if (state.scenario === 'feed') return 'pH';
+    if (state.scenario === 'types') return 'c';
+    if (state.scenario === 'aq') {
+      // 强酸/强碱/纯水没有酸根物种，δ 图会是空的，退回 lg c 视图
+      var hasDeltaSeries = false;
+      try {
+        hasDeltaSeries = scene.makeState(state.aq.pHmin || 0).species.some(function (s) { return s.kind === 'acid'; });
+      } catch (e) { hasDeltaSeries = true; }
+      if (!hasDeltaSeries) return 'lgc';
+      return 'delta';
+    }
+    if (state.scenario === 'mix') return 'lgc';
+    return 'delta';
+  }
+
+  // 整组量可勾选显示哪几条
+  // 整组量可勾选显示哪几条；键带场景前缀，避免跨场景串味
+  function hidKey(s) { return state.scenario + '::' + s.key; }
+  function renderSeriesPick(list) {
+    var box = $('#seriesPick');
+    if (!box) return;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    var cnt = $('#pickCount');
+    if (!list || !list.length) { if (cnt) cnt.textContent = ''; return; }
+    var shown = list.filter(function (s) { return !(state.hidden && state.hidden[hidKey(s)]); }).length;
+    if (cnt) cnt.textContent = shown + ' / ' + list.length + ' 条';
+    list.forEach(function (s) {
+      var off = !!(state.hidden && state.hidden[hidKey(s)]);
+      var row = document.createElement('div');
+      row.className = 'row';
+      row.style.cssText = 'gap:4px';
+      var lab = document.createElement('label');
+      lab.className = 'chk mini';
+      lab.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12.5px;min-height:28px;flex:1;min-width:0' + (off ? ';opacity:.42' : '');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !off;
+      cb.onchange = function () {
+        state.hidden = state.hidden || {};
+        if (this.checked) delete state.hidden[hidKey(s)]; else state.hidden[hidKey(s)] = true;
+        redraw();
+      };
+      var sw = document.createElement('span');
+      sw.style.cssText = 'width:16px;flex:none;border-top:2px solid ' + s.color;
+      var tx = document.createElement('span');
+      tx.textContent = s.label;
+      tx.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      lab.appendChild(cb); lab.appendChild(sw); lab.appendChild(tx);
+      var only = document.createElement('button');
+      only.className = 'btn sm';
+      only.textContent = '只留';
+      only.title = '只显示这一条';
+      only.style.cssText = 'min-height:22px;padding:0 6px;font-size:11px;flex:none';
+      only.onclick = function (ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        var nh = {};
+        list.forEach(function (o) { if (o !== s) nh[hidKey(o)] = true; });
+        state.hidden = nh;
+        redraw();
+      };
+      row.appendChild(lab); row.appendChild(only);
+      box.appendChild(row);
+    });
+  }
+
+  function redraw() {
+    var built = buildSeries();
+    renderSeriesPick(built.all);
+    if (scene.id === 'mix') {
+      if (state.mix.pick === null || state.mix.pick === undefined) {
+        var lo0 = Math.log10(state.mix.cMin), hi0 = Math.log10(state.mix.cMax);
+        state.mix.pick = hi0 - (hi0 - lo0) * 0.35;
+      }
+      built.inter = findIntersections(built.series);
+      built.endLabels = true;
+      built.pickX = state.mix.pick;
+    }
+    window.__dbg = { marks: (built.marks || []).length, series: built.series.length, x: built.xq.id, y1: built.y1q.id, data: built.series, inter: (built.inter || []).length };
+    var geo = render(built);
+    last.geo = geo; last.built = built; last.xLabel = built.xq.label;
+    updatePickUI(built);
+    $('#status').textContent = built.series.length + ' 条曲线 · 扫描 ' + built.xq.label +
+      (state.axes.useY2 ? ' · 双纵轴' : '') + (state.activity && activitySupported() ? ' · 活度模型' : '') +
+      (state.notice ? '　⚠ ' + state.notice : '');
+    $('#swap').disabled = false;
+    $('#swap').title = '交换 X 与 Y';
+  }
+
+  function updatePickUI(built) {
+    var on = scene.id === 'mix';
+    $('#pickcard').classList.toggle('hidden', !on);
+    var box = $('#cards');
+    while (box.firstChild) box.removeChild(box.firstChild);
+    if (!on) return;
+
+    var lo = Math.log10(state.mix.cMin), hi = Math.log10(state.mix.cMax);
+    var v = state.mix.pick;
+    $('#pick').value = String(Math.round((v - lo) / (hi - lo) * 1000));
+    $('#pickval').textContent = '10^' + v.toFixed(2);
+
+    var st = built.states[0];
+    var bd = Infinity;
+    built.states.forEach(function (s) { var d = Math.abs(s.s - v); if (d < bd) { bd = d; st = s; } });
+    if (!st) return;
+
+    var sp = st.species.slice().sort(function (a, b) { return b.c - a.c; });
+    var parts = [];
+    sp.forEach(function (x, i) {
+      if (i > 0) {
+        var prev = sp[i - 1];
+        parts.push(Math.abs(Math.log10(prev.c / x.c)) < 0.045 ? '≈' : '>');
+      }
+      parts.push('c(' + x.label + ')');
+    });
+    var o = document.createElement('div'); o.className = 'order';
+    o.innerHTML = '<code>' + parts.join(' ') + '</code>';
+    box.appendChild(o);
+
+    var bar = document.createElement('div');
+    bar.className = 'row';
+    bar.style.margin = '0';
+    var txt = document.createElement('span');
+    txt.className = 'hint';
+    txt.textContent = state.cardsOpen ? '已展开' : '共 ' + (sp.length + 1) + ' 项数据';
+    var tg = document.createElement('button');
+    tg.className = 'btn sm';
+    tg.textContent = state.cardsOpen ? '收起明细' : '展开明细';
+    tg.onclick = function () { state.cardsOpen = !state.cardsOpen; updatePickUI(built); };
+    bar.appendChild(txt); bar.appendChild(tg);
+    box.appendChild(bar);
+
+    if (!state.cardsOpen) return;
+
+    var grid = document.createElement('div');
+    grid.className = 'cardgrid';
+    var ph = document.createElement('div'); ph.className = 'cardx';
+    ph.innerHTML = '<div class="t">pH</div><div class="v">' + st.pH.toFixed(3) + '</div>';
+    grid.appendChild(ph);
+    sp.forEach(function (x) {
+      var d = document.createElement('div'); d.className = 'cardx';
+      d.innerHTML = '<div class="t">c(' + x.label + ')</div><div class="v">' + fmtSci(x.c) + '</div>';
+      grid.appendChild(d);
+    });
+    box.appendChild(grid);
+  }
+
+  /* ================= 导出 ================= */
+
+  function download(name, blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  }
+  function stamp() {
+    var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
+  }
+  function exportSVG() {
+    if (!last || !last.series || !last.series.length) { $('#status').textContent = '当前没有曲线可导出'; return; }
+    var node = last.svg.cloneNode(true);
+    node.setAttribute('xmlns', NS); node.setAttribute('width', last.W); node.setAttribute('height', last.H);
+    var s = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(node);
+    download('平衡曲线-' + stamp() + '.svg', new Blob([s], { type: 'image/svg+xml;charset=utf-8' }));
+  }
+  function exportPNG() {
+    if (!last || !last.series || !last.series.length) { $('#status').textContent = '当前没有曲线可导出'; return; }
+    var node = last.svg.cloneNode(true);
+    node.setAttribute('xmlns', NS);
+    var s = new XMLSerializer().serializeToString(node);
+    var img = new Image(), scale = 3;
+    img.onload = function () {
+      var cv = document.createElement('canvas');
+      cv.width = last.W * scale; cv.height = last.H * scale;
+      var ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      cv.toBlob(function (b) { download('平衡曲线-' + stamp() + '.png', b); }, 'image/png');
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+  }
+  function exportCSV() {
+    if (!last || !last.series || !last.series.length) {
+      $('#status').textContent = '当前没有曲线可导出，请先选择物质或预设';
+      return;
+    }
+    var rows = [(last.xLabel || 'x') + ',' + last.series.map(function (s) { return s.label; }).join(',')];
+    var n = last.series[0].pts.length;
+    var step = Math.max(1, Math.round(n / 300));
+    for (var i = 0; i < n; i += step) {
+      var line = [fmt(last.series[0].pts[i].x, 4)];
+      last.series.forEach(function (s) { line.push(isFinite(s.pts[i].y) ? s.pts[i].y.toFixed(6) : ''); });
+      rows.push(line.join(','));
+    }
+    download('平衡曲线数据-' + stamp() + '.csv', new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' }));
+  }
+
+  /* ================= 预设 ================= */
+
+  function presetAq(key, y1) {
+    return function () {
+      state.scenario = 'aq';
+      state.aq = { system: 'acid', keys: [key], c: 0.1, sweep: 'pH', pHmin: 0, pHmax: 14, lmax: 6, Tc: 25 };
+      state.axes = { x: '__sweep', y1: y1 || 'delta', y2: null, useY2: false };
+    };
+  }
+  function presetTit(key) {
+    return function () {
+      state.scenario = 'tit';
+      state.tit = { key: key, c: 0.1, v0: 20, titrant: key === 'NH3' ? 'acid' : 'base', ct: 0.1, Tc: 25 };
+      state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false };
+    };
+  }
+  var PRESETS = [
+    { n: 'H₂CO₃ 分布', f: presetAq('H2CO3') },
+    { n: 'H₃PO₄ 分布', f: presetAq('H3PO4') },
+    { n: '醋酸分布', f: presetAq('HAc') },
+    {
+      n: '氯代乙酸对比', f: function () {
+        state.scenario = 'aq';
+        state.aq = { keys: ['ClCH2COOH', 'Cl2CHCOOH', 'Cl3CCOOH'], c: 0.1, sweep: 'pH', pHmin: 0, pHmax: 14, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'delta', y2: null, useY2: false };
+      }
+    },
+    {
+      n: 'lg c(H⁺)–lg c(OH⁻)', f: function () {
+        state.scenario = 'aq';
+        state.aq = { keys: ['water'], c: 0.1, sweep: 'pH', pHmin: 0, pHmax: 14, Tc: 25 };
+        state.axes = { x: 'lgH', y1: 'lgOH', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '稀释曲线（醋酸）', f: function () {
+        state.scenario = 'dil';
+        state.dil = { keys: ['HAc'], c0: 0.1, lmax: 6, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '碳酸钠溶液（δ–pH）', f: function () {
+        state.scenario = 'aq';
+        state.aq = { keys: ['Na2CO3'], c: 0.1, pHmin: 0, pHmax: 14, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'delta', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '稀释曲线（碳酸钠）', f: function () {
+        state.scenario = 'dil';
+        state.dil = { keys: ['Na2CO3'], c0: 0.1, lmax: 6, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false };
+      }
+    },
+    { n: '醋酸滴定', f: presetTit('HAc') },
+    { n: '盐酸滴定', f: presetTit('HCl') },
+    { n: '氨水滴定', f: presetTit('NH3') },
+    { n: '草酸分步滴定', f: presetTit('H2C2O4') },
+    { n: 'Fe(OH)₃–pH', f: function () { state.scenario = 'precip'; state.precip = { salts: ['Fe(OH)3'], sweep: 'pH', Tc: 25 }; state.axes = { x: '__sweep', y1: 'lgM', y2: null, useY2: false }; } },
+    { n: 'AgCl/AgBr/AgI', f: function () { state.scenario = 'precip'; state.precip = { salts: ['AgCl', 'AgBr', 'AgI'], sweep: 'lgA', Tc: 25 }; state.axes = { x: '__sweep', y1: 'lgM', y2: null, useY2: false }; } },
+    { n: 'CdS 平衡线', f: function () { state.scenario = 'precip'; state.precip = { salts: ['CdS'], sweep: 'lgA', Tc: 25 }; state.axes = { x: '__sweep', y1: 'lgM', y2: null, useY2: false }; } },
+    { n: 'SrSO₄ 平衡线', f: function () { state.scenario = 'precip'; state.precip = { salts: ['SrSO4'], sweep: 'lgA', Tc: 25 }; state.axes = { x: '__sweep', y1: 'lgM', y2: null, useY2: false }; } },
+    { n: '纯水 pH–T', f: function () { state.scenario = 'temp'; state.temp = { key: 'water', c: 0.1 }; state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false }; } },
+    { n: '醋酸 pH–T', f: function () { state.scenario = 'temp'; state.temp = { key: 'HAc', c: 0.1 }; state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false }; } },
+    {
+      n: 'H₃PO₄ 微粒–浓度', f: function () {
+        state.scenario = 'mix';
+        state.mix = { comps: [{ key: 'H3PO4', ratio: 1 }], cMin: 1e-10, cMax: 1, Tc: 25, pick: null };
+        state.axes = { x: '__sweep', y1: 'lgc', y2: null, useY2: false };
+      }
+    },
+    {
+      n: 'NaHCO₃ 微粒–浓度', f: function () {
+        state.scenario = 'mix';
+        state.mix = { comps: [{ key: 'NaHCO3', ratio: 1 }], cMin: 1e-10, cMax: 1, Tc: 25, pick: null };
+        state.axes = { x: '__sweep', y1: 'lgc', y2: null, useY2: false };
+      }
+    },
+    {
+      n: 'HAc+NaAc 缓冲', f: function () {
+        state.scenario = 'mix';
+        state.mix = { comps: [{ key: 'HAc', ratio: 1 }, { key: 'NaAc', ratio: 1 }], cMin: 1e-8, cMax: 1, Tc: 25, pick: null };
+        state.axes = { x: '__sweep', y1: 'lgc', y2: null, useY2: false };
+      }
+    },
+    {
+      n: 'δ–pH 互换', f: function () {
+        state.scenario = 'aq';
+        state.aq = { keys: ['H2CO3'], c: 0.1, sweep: 'pH', pHmin: 0, pHmax: 14, Tc: 25 };
+        state.axes = { x: 'delta', y1: 'pH', y2: null, useY2: false };
+      }
+    },
+    {
+      n: 'lg 比值图', f: function () {
+        state.scenario = 'aq';
+        state.aq = { keys: ['H2CO3'], c: 0.1, sweep: 'pH', pHmin: 0, pHmax: 14, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'r0_0', y2: null, useY2: false };
+      }
+    },
+    {
+      n: 'pC–pH', f: function () {
+        state.scenario = 'aq';
+        state.aq = { keys: ['H3PO4'], c: 0.1, sweep: 'pH', pHmin: 0, pHmax: 14, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'pC', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '滴定+分布（双纵轴）', f: function () {
+        state.scenario = 'tit';
+        state.tit = { key: 'HAc', c: 0.1, v0: 20, titrant: 'base', ct: 0.1, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'delta', y2: 'pH', useY2: true };
+      }
+    },
+    {
+      n: 'NaHCO₃ 溶液（样图）', f: function () {
+        state.scenario = 'types';
+        state.types = { cls: 'NaHA', acid: 'H2CO3', cMin: 1e-12, cMax: 1, Tc: 25 };
+        state.axes = defaultAxesFor('types');
+      }
+    },
+    {
+      n: 'Na₂CO₃ 溶液', f: function () {
+        state.scenario = 'types';
+        state.types = { cls: 'Na2A', acid: 'H2CO3', cMin: 1e-12, cMax: 1, Tc: 25 };
+        state.axes = defaultAxesFor('types');
+      }
+    },
+    {
+      n: '投料比（HAc + NaOH）', f: function () {
+        state.scenario = 'feed';
+        state.feed = { denom: 'acid', acid: 'HAc', base: 'NaOH', c0: 0.1, rmax: 3, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '投料比（HCl + Ca(OH)₂）', f: function () {
+        state.scenario = 'feed';
+        state.feed = { denom: 'base', acid: 'HCl', base: 'Ca(OH)2', c0: 0.1, rmax: 3, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '磷酸滴定 + 分布（双纵轴）', f: function () {
+        state.scenario = 'tit';
+        state.tit = { key: 'H3PO4', c: 0.1, v0: 20, titrant: 'base', ct: 0.1, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'delta', y2: 'pH', useY2: true };
+      }
+    },
+    {
+      n: '水电离随 V 变化', f: function () {
+        state.scenario = 'tit';
+        state.tit = { key: 'HAc', c: 0.1, v0: 20, titrant: 'base', ct: 0.1, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'cwater', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '分步沉淀 Cl/Br/I', f: function () {
+        state.scenario = 'ptit';
+        state.ptit = { salts: ['AgCl', 'AgBr', 'AgI'], c0: 0.1, v0: 20, ct: 0.1, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'pX', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '电导滴定（盐酸）', f: function () {
+        state.scenario = 'tit';
+        state.tit = { key: 'HCl', c: 0.1, v0: 20, titrant: 'base', ct: 0.1, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'kappa', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '电导滴定（醋酸）', f: function () {
+        state.scenario = 'tit';
+        state.tit = { key: 'HAc', c: 0.1, v0: 20, titrant: 'base', ct: 0.1, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'kappa', y2: null, useY2: false };
+      }
+    },
+    {
+      n: '中性 K₂Cr₂O₇ 稀释', f: function () {
+        state.scenario = 'cr';
+        state.cr = { system: 'chromium', key: 'HAc', c0: 0.5, x: null, lmax: 8, Tc: 25 };
+        state.axes = { x: '__sweep', y1: 'pH', y2: null, useY2: false };
+      }
+    }
+  ];
+
+  // 预设分类按名称判定，避免与数组下标耦合
+  function presetCat(name) {
+    if (/分步沉淀/.test(name)) return '沉淀';
+    if (/电导滴定/.test(name)) return '滴定';
+    if (/滴定/.test(name)) return '滴定';
+    if (/AgCl|Fe\(OH\)|CdS|SrSO|沉淀|Ksp/.test(name)) return '沉淀';
+    if (/微粒|缓冲/.test(name)) return '混合';
+    if (/pH–T/.test(name)) return '温度';
+    if (/稀释|K₂Cr₂O₇/.test(name)) return '稀释';
+    return '酸碱分布';
+  }
+  PRESETS.forEach(function (p) { p.g = presetCat(p.n); });
+
+  function fillPresets() {
+    var sel = $('#presetSel');
+    var head = document.createElement('option');
+    head.value = ''; head.textContent = '选择预设场景…';
+    sel.appendChild(head);
+    var seen = {};
+    PRESETS.forEach(function (p) {
+      if (!seen[p.g]) {
+        var og = document.createElement('optgroup'); og.label = p.g;
+        sel.appendChild(og); seen[p.g] = og;
+      }
+      var o = document.createElement('option');
+      o.value = p.n; o.textContent = p.n;
+      seen[p.g].appendChild(o);
+    });
+  }
+
+  /* ================= 绑定 ================= */
+
+  function bind() {
+    $('#presetSel').onchange = function () {
+      var v = this.value;
+      var p = PRESETS.find(function (x) { return x.n === v; });
+      if (!p) return;
+      p.f();
+      state.overlays = [];
+      state.hidden = {};
+      $('#scenario').value = state.scenario;
+      initScene(false);
+      this.value = '';
+      if (window.renderLayers) window.renderLayers();
+    };
+    $('#scenario').onchange = function () {
+      state.scenario = this.value;
+      $('#presetSel').value = '';
+      state.overlays = [];
+      state.hidden = {};
+      if (window.renderLayers) window.renderLayers();
+      state.axes = defaultAxesFor(state.scenario);
+      if (state.scenario === 'precip') {
+        state.precip.salts = state.precip.sweep === 'pH' ? ['Fe(OH)3'] : ['CdS'];
+      }
+      initScene(false);
+    };
+    $('#axX').onchange = function () { state.axes.x = this.value; fixPrecipAxes(); if (state.scenario === 'precip') initScene(true); else redraw(); };
+    $('#axY1').onchange = function () { state.axes.y1 = this.value; fixPrecipAxes(); if (state.scenario === 'precip') initScene(true); else redraw(); };
+    $('#axY2').onchange = function () { state.axes.y2 = this.value; redraw(); };
+    $('#useY2').onchange = function () {
+      state.axes.useY2 = this.checked;
+      $('#axY2').disabled = !this.checked;
+      if (this.checked && (!state.axes.y2 || state.axes.y2 === state.axes.x)) {
+        var cand = scene.quantities.filter(function (q) { return q.id !== state.axes.y1 && q.id !== state.axes.x; });
+        state.axes.y2 = cand.length ? cand[0].id : state.axes.y1;
+      }
+      redraw();
+    };
+    $('#swap').onclick = function () {
+      var t = state.axes.x;
+      state.axes.x = state.axes.y1;
+      state.axes.y1 = t;
+      $('#axX').value = state.axes.x;
+      $('#axY1').value = state.axes.y1;
+      redraw();
+    };
+    $('#marks').onchange = function () { state.marks = this.checked; redraw(); };
+    $('#revX').onchange = function () { state.axes.revX = this.checked; redraw(); };
+    $('#revY').onchange = function () { state.axes.revY = this.checked; redraw(); };
+    $('#revY2').onchange = function () { state.axes.revY2 = this.checked; redraw(); };
+    $('#pick').oninput = function () {
+      if (scene.id !== 'mix') return;
+      var lo = Math.log10(state.mix.cMin), hi = Math.log10(state.mix.cMax);
+      state.mix.pick = lo + (hi - lo) * (parseFloat(this.value) / 1000);
+      redraw();
+    };
+    $('#activity').onchange = function () { state.activity = this.checked; initScene(true); };
+    $('#aspect').value = state.aspect;
+    $('#aspect').onchange = function () { state.aspect = this.value; redraw(); };
+    $('#maxw').value = String(state.maxW);
+    $('#maxw').onchange = function () { state.maxW = parseFloat(this.value); redraw(); };
+    $('#caption').onchange = function () { state.caption = this.checked; redraw(); };
+    function bindRange(id, key) {
+      var el2 = $('#' + id);
+      if (!el2) return;
+      el2.value = state.axes[key] === null || state.axes[key] === undefined ? '' : String(state.axes[key]);
+      el2.onchange = function () {
+        var v = this.value === '' ? null : parseFloat(this.value);
+        state.axes[key] = isFinite(v) ? v : null;
+        redraw();
+      };
+    }
+    bindRange('xmin', 'xmin'); bindRange('xmax', 'xmax');
+    bindRange('ymin', 'y1min'); bindRange('ymax', 'y1max');
+    $('#diag45').checked = !!state.diag45;
+    $('#diag45').onchange = function () { state.diag45 = this.checked; redraw(); };
+    $('#tickFmt').value = state.tickFmt || 'E';
+    $('#tickFmt').onchange = function () { state.tickFmt = this.value; redraw(); };
+    renderTabs();
+    // ---- 曲线组（共用横轴的叠加层） ----
+    function layerLabel() {
+      var p = state[state.scenario];
+      if (state.scenario === 'tit') return spOf(p.key).name + ' ' + p.c + ' mol/L';
+      if (state.scenario === 'aq' || state.scenario === 'dil') {
+        return (p.keys || []).map(function (k) { return (DATA.compounds[k] && DATA.compounds[k].name) || k; }).join('+').slice(0, 16);
+      }
+      if (state.scenario === 'precip') return (p.salts || []).join('/');
+      if (state.scenario === 'ptit') return (p.salts || []).join('/');
+      var c = String(scene.caption || state.scenario).split('｜');
+      return (c[0] + (c[1] ? ' ' + c[1].trim() : '')).slice(0, 20);
+    }
+    function renderLayers() {
+      var box = $('#layers');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      (state.overlays || []).forEach(function (ov, i) {
+        var row = document.createElement('div'); row.className = 'row';
+        var sp = document.createElement('span');
+        sp.style.cssText = 'flex:1;font-size:13px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        sp.textContent = '◍ ' + ov.label;
+        var btn = document.createElement('button'); btn.className = 'btn sm'; btn.textContent = '✕';
+        btn.onclick = function () { state.overlays.splice(i, 1); renderLayers(); redraw(); };
+        row.appendChild(sp); row.appendChild(btn); box.appendChild(row);
+      });
+    }
+    window.renderLayers = renderLayers;
+    $('#addLayer').onclick = function () {
+      state.overlays.push({
+        scenario: state.scenario,
+        params: JSON.parse(JSON.stringify(state[state.scenario])),
+        x: state.axes.x, y: state.axes.y1, label: layerLabel()
+      });
+      renderLayers(); redraw();
+    };
+    $('#batchAdd').onclick = function () {
+      var key = { aq: 'c', dil: 'c0', tit: 'c', precip: 'c0', ptit: 'c0', temp: 'c', cr: 'c0' }[state.scenario] || 'c';
+      var vals = ($('#batchVals').value || '').split(/[,，\\s]+/).map(parseFloat).filter(function (v) { return isFinite(v) && v > 0; });
+      if (!vals.length) { $('#status').textContent = '请先填写浓度序列，如 0.1,0.01'; return; }
+      vals.forEach(function (v) {
+        var pp = JSON.parse(JSON.stringify(state[state.scenario]));
+        pp[key] = v;
+        state.overlays.push({ scenario: state.scenario, params: pp, x: state.axes.x, y: state.axes.y1, label: layerLabel() + ' · ' + v + ' mol/L' });
+      });
+      renderLayers(); redraw();
+    };
+    $('#pickAll').onclick = function () { state.hidden = {}; redraw(); };
+    $('#pickInvert').onclick = function () {
+      var all = (last && last.built && last.built.all) || [];
+      var nh = {};
+      all.forEach(function (s) { if (!(state.hidden && state.hidden[state.scenario + '::' + s.key])) nh[state.scenario + '::' + s.key] = true; });
+      state.hidden = nh;
+      redraw();
+    };
+    $('#exp-svg').onclick = exportSVG;
+    $('#exp-png').onclick = exportPNG;
+    $('#exp-csv').onclick = exportCSV;
+    renderLayers();
+    window.addEventListener('resize', function () {
+      clearTimeout(window.__rt);
+      window.__rt = setTimeout(redraw, 160);
+    });
+  }
+
+  /* ================= 启动 ================= */
+
+  fillPresets();
+  bind();
+  initScene(false);
+})();
+</script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

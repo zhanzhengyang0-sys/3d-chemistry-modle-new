@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>碘晶胞 · 极简触屏版</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: white;
+            touch-action: pan-y pinch-zoom; /* 优化触屏 */
+        }
+        
+        /* 所有文字板块已完全移除 */
+        
+        /* 极简颜色指示器 - 半透明小标签，几乎不占空间 */
+        .mini-status {
+            position: absolute;
+            bottom: 80px;
+            right: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-size: 11px;
+            border-left: 3px solid #4a2a6b;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            color: #2a2f40;
+            pointer-events: none;
+            z-index: 150;
+            opacity: 0.8;
+        }
+        .mini-status span {
+            font-weight: 600;
+            color: #4a2a6b;
+        }
+        
+        /* 底部选色板 + 开关容器 - 超薄一体化设计，最小化纵向厚度 */
+        #color-palette {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            padding: 8px 18px;
+            border-radius: 40px;
+            display: flex;
+            gap: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            z-index: 200;
+            line-height: 0;
+            align-items: center;
+        }
+        
+        /* 颜色圆形 - 缩小尺寸但保持易点按 */
+        .color-option {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .color-option:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+        
+        .color-option.selected {
+            border: 3px solid #ffd966;
+            transform: scale(1.08);
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+        }
+        
+        /* 极薄开关按钮 - 与调色板融合，轻薄简约 */
+        .reset-btn {
+            background: rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            border-radius: 32px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #3a2a5e;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            backdrop-filter: blur(4px);
+            letter-spacing: 0.3px;
+            line-height: 1;
+            font-family: inherit;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        
+        .reset-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+            border-color: rgba(0, 0, 0, 0.2);
+            transform: scale(1.02);
+        }
+        
+        .reset-btn:active {
+            transform: scale(0.98);
+        }
+        
+        /* 触屏设备上增大点击响应区域，但保持轻薄外观 */
+        @media (max-width: 768px) {
+            .color-option {
+                width: 42px;
+                height: 42px;
+                margin: -3px 0;
+            }
+            #color-palette {
+                padding: 6px 16px;
+                gap: 16px;
+            }
+            .reset-btn {
+                padding: 5px 12px;
+                font-size: 11px;
+            }
+            .mini-status {
+                bottom: 90px;
+                font-size: 10px;
+                padding: 3px 8px;
+            }
+        }
+        
+        #color-1 { background-color: #4a2a6b; } /* 深紫 */
+        #color-2 { background-color: #1a3a6b; } /* 深蓝 */
+        #color-3 { background-color: #8b0000; } /* 血红 */
+        
+        /* 可选的小提示 - 非常淡，几乎不引人注意 */
+        .hint-tiny {
+            position: absolute;
+            bottom: 70px;
+            left: 12px;
+            background: rgba(255,255,255,0.4);
+            backdrop-filter: blur(2px);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 9px;
+            color: #666;
+            border: 1px solid #ddd;
+            opacity: 0.5;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+    </head>
+<body>
+    <!-- 所有文字板块已移除：左上info、左下note、右下status已替换为极简版本 -->
+    
+    <!-- 极简颜色指示器 (极小) -->
+    <div class="mini-status">
+        <span id="current-color-label">深紫</span>
+    </div>
+    
+    <!-- 几乎看不见的提示 (仅为触屏用户准备，极小) -->
+    <div class="hint-tiny">👆 点色块→点原子 | ↻ 恢复</div>
+    
+    <!-- 超薄底部选色板 + 恢复开关一体化 -->
+    <div id="color-palette">
+        <div id="color-1" class="color-option selected" title="深紫色"></div>
+        <div id="color-2" class="color-option" title="深蓝色"></div>
+        <div id="color-3" class="color-option" title="血红色"></div>
+        <div id="reset-colors" class="reset-btn" title="恢复所有分子颜色">↻ 恢复</div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景、相机、渲染器 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff); // 白色背景
+
+        // 调整相机位置使图像更大（拉近视角，充分利用空间）
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5.8, 3.8, 7.2); // 更近的距离，图像更大
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.3;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.07;
+        controls.target.set(0, 0, 0);
+        controls.maxPolarAngle = Math.PI / 2;
+        
+        // 触屏优化
+        controls.touchRotate = true;
+        controls.touchZoom = true;
+        controls.touchPan = true;
+
+        // --- 光源配置 (适应白底) ---
+        const ambient = new THREE.AmbientLight(0x50586b);
+        scene.add(ambient);
+
+        const keyLight = new THREE.DirectionalLight(0xfff5ea, 1.5);
+        keyLight.position.set(3, 5, 4);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xe0ecff, 1.2);
+        fillLight.position.set(-4, 2, -3);
+        scene.add(fillLight);
+
+        const backLight = new THREE.PointLight(0xa0b2d0, 0.8);
+        backLight.position.set(-2, 1, -5);
+        scene.add(backLight);
+
+        const rimLight = new THREE.PointLight(0xffe0c0, 0.9);
+        rimLight.position.set(2, 3, -4);
+        scene.add(rimLight);
+
+        const extraLight1 = new THREE.PointLight(0xcc99ff, 0.6);
+        extraLight1.position.set(2, 4, 3);
+        scene.add(extraLight1);
+        
+        const extraLight2 = new THREE.PointLight(0xaaccff, 0.5);
+        extraLight2.position.set(-3, -1, 4);
+        scene.add(extraLight2);
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xc0d0f0, 0.6);
+        scene.add(hemiLight);
+
+        // ========== 构建晶胞 ==========
+        const size = 4.0;
+        const half = size / 2;
+
+        // 原子参数
+        const atomRadius = 0.26;
+        const bondLength = 0.85;
+        const bondRadius = 0.07;
+        
+        // 立方体棱粗细
+        const edgeThickness = bondRadius / 3; // 0.07 / 3 ≈ 0.02333
+
+        // 使用圆柱体绘制立方体棱，灰黑色
+        function createSolidEdge(start, end, color, thickness) {
+            const startVec = new THREE.Vector3(start[0], start[1], start[2]);
+            const endVec = new THREE.Vector3(end[0], end[1], end[2]);
+            
+            const direction = new THREE.Vector3().subVectors(endVec, startVec);
+            const length = direction.length();
+            
+            const center = new THREE.Vector3().addVectors(startVec, endVec).multiplyScalar(0.5);
+            
+            const cylinderGeo = new THREE.CylinderGeometry(thickness, thickness, length, 8);
+            const cylinderMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4, metalness: 0.1 });
+            const cylinder = new THREE.Mesh(cylinderGeo, cylinderMat);
+            
+            const defaultDir = new THREE.Vector3(0, 1, 0);
+            const quat = new THREE.Quaternion().setFromUnitVectors(defaultDir, direction.clone().normalize());
+            cylinder.applyQuaternion(quat);
+            cylinder.position.copy(center);
+            
+            return cylinder;
+        }
+
+        // 定义立方体的12条棱的端点
+        const corners = [
+            [-half, -half, -half], [ half, -half, -half], [ half, -half,  half], [-half, -half,  half],
+            [-half,  half, -half], [ half,  half, -half], [ half,  half,  half], [-half,  half,  half]
+        ];
+        
+        const edges = [
+            [0, 1], [1, 2], [2, 3], [3, 0],
+            [4, 5], [5, 6], [6, 7], [7, 4],
+            [0, 4], [1, 5], [2, 6], [3, 7]
+        ];
+
+        const edgeColor = 0x4a4f65; // 灰黑色
+
+        edges.forEach(edgeIndices => {
+            const start = corners[edgeIndices[0]];
+            const end = corners[edgeIndices[1]];
+            const edgeCylinder = createSolidEdge(start, end, edgeColor, edgeThickness);
+            scene.add(edgeCylinder);
+        });
+
+        // 极淡的透明实体
+        const ghostMat = new THREE.MeshPhongMaterial({ 
+            color: 0xe0e8f0, 
+            wireframe: false, 
+            transparent: true, 
+            opacity: 0.02,
+            emissive: 0x000000
+        });
+        const ghostBox = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), ghostMat);
+        scene.add(ghostBox);
+
+        // ========== 原子材质定义 ==========
+        // 初始深紫色 (#4a2a6b)
+        const initialPurple = 0x4a2a6b;
+        const deepBlue = 0x1a3a6b;
+        const bloodRed = 0x8b0000;
+        
+        // 当前选中的颜色 (初始深紫色)
+        let currentColor = new THREE.Color(initialPurple);
+        
+        // 化学键材质 - 保持不变
+        const bondMat = new THREE.MeshStandardMaterial({ 
+            color: 0x8a56c9, 
+            roughness: 0.35, 
+            metalness: 0.05, 
+            emissive: 0x1a1033,
+            emissiveIntensity: 0.05
+        });
+
+        // 存储所有原子对象的数组，用于射线检测
+        const atoms = [];
+        
+        // 存储所有分子组的映射关系：原子ID -> 同分子另一个原子ID
+        const moleculePairs = new Map();
+        
+        // 存储每个原子的原始材质引用 (为了恢复时能正确重置，我们保存每个原子对应的初始材质颜色值)
+        // 但由于所有原子初始颜色都是 initialPurple，恢复时只需要将所有原子颜色设回 initialPurple 即可。
+        // 同时需要保留克隆材质的独立性。
+
+        // 分子创建函数 - 返回包含两个原子和键的group，并记录原子关系
+        function createMolecule(centerPos, directionVec, initialColor, bondMat) {
+            const group = new THREE.Group();
+            const dir = directionVec.clone().normalize();
+            const offset = dir.clone().multiplyScalar(bondLength / 2);
+            
+            const atomGeo = new THREE.SphereGeometry(atomRadius, 48, 32);
+            
+            // 创建两个原子，使用相同颜色
+            const atomMat = new THREE.MeshStandardMaterial({ 
+                color: initialColor,
+                roughness: 0.25, 
+                metalness: 0.1, 
+                emissive: 0x1a0033,
+                emissiveIntensity: 0.1
+            });
+            
+            const atomA = new THREE.Mesh(atomGeo, atomMat.clone()); // 克隆材质以便单独修改
+            atomA.position.copy(offset.clone().negate());
+            group.add(atomA);
+            
+            const atomB = new THREE.Mesh(atomGeo, atomMat.clone());
+            atomB.position.copy(offset);
+            group.add(atomB);
+            
+            // 记录这两个原子属于同一个分子
+            moleculePairs.set(atomA.id, atomB.id);
+            moleculePairs.set(atomB.id, atomA.id);
+            
+            // 添加到原子数组以便射线检测
+            atoms.push(atomA);
+            atoms.push(atomB);
+            
+            // 化学键
+            const cylinderGeo = new THREE.CylinderGeometry(bondRadius, bondRadius, bondLength, 12);
+            const cylinder = new THREE.Mesh(cylinderGeo, bondMat);
+            const defaultDir = new THREE.Vector3(0, 1, 0);
+            const quat = new THREE.Quaternion().setFromUnitVectors(defaultDir, dir);
+            cylinder.applyQuaternion(quat);
+            group.add(cylinder);
+            
+            group.position.copy(centerPos);
+            return group;
+        }
+
+        // ========== 定义各组朝向 ==========
+        const dirRed = new THREE.Vector3(0.7, 1, 0).normalize();
+        const dirYellow = new THREE.Vector3(0.7, -1, 0).normalize();
+        const dirGreen = new THREE.Vector3(-0.7, 1, 0).normalize();
+
+        // 顶点分子 (8个)
+        const vertexPositions = [
+            [-half, -half, -half], [ half, -half, -half], [ half, -half,  half], [-half, -half,  half],
+            [-half,  half, -half], [ half,  half, -half], [ half,  half,  half], [-half,  half,  half]
+        ];
+        vertexPositions.forEach(pos => {
+            const mol = createMolecule(new THREE.Vector3(pos[0], pos[1], pos[2]), dirRed, initialPurple, bondMat);
+            scene.add(mol);
+        });
+
+        // 上下两面
+        const topMol = createMolecule(new THREE.Vector3(0, half, 0), dirYellow, initialPurple, bondMat);
+        scene.add(topMol);
+        const bottomMol = createMolecule(new THREE.Vector3(0, -half, 0), dirYellow, initialPurple, bondMat);
+        scene.add(bottomMol);
+
+        // 左右两面
+        const rightMol = createMolecule(new THREE.Vector3(half, 0, 0), dirGreen, initialPurple, bondMat);
+        scene.add(rightMol);
+        const leftMol = createMolecule(new THREE.Vector3(-half, 0, 0), dirGreen, initialPurple, bondMat);
+        scene.add(leftMol);
+
+        // 前后两面
+        const frontMol = createMolecule(new THREE.Vector3(0, 0, half), dirRed, initialPurple, bondMat);
+        scene.add(frontMol);
+        const backMol = createMolecule(new THREE.Vector3(0, 0, -half), dirRed, initialPurple, bondMat);
+        scene.add(backMol);
+
+        // 极淡的阴影平面
+        const planeGeometry = new THREE.CircleGeometry(4, 32);
+        const planeMaterial = new THREE.MeshStandardMaterial({
+            color: 0xf0f2f8,
+            transparent: true,
+            opacity: 0.08,
+            side: THREE.DoubleSide
+        });
+        const groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+        groundPlane.rotation.x = -Math.PI / 2;
+        groundPlane.position.set(0, -half - 0.4, 0);
+        scene.add(groundPlane);
+
+        // ========== 射线检测器 (同时支持鼠标和触屏) ==========
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // 统一的点击处理函数
+        function onPick(event) {
+            // 阻止默认事件（如滚动）
+            event.preventDefault();
+            
+            // 计算触摸点或鼠标点的坐标
+            const rect = renderer.domElement.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (event.touches) {
+                // 触摸事件
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                // 鼠标事件
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+            
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            // 检测所有原子
+            const intersects = raycaster.intersectObjects(atoms);
+            
+            if (intersects.length > 0) {
+                // 获取被点击的原子
+                const clickedAtom = intersects[0].object;
+                
+                // 找到同分子的另一个原子
+                const partnerId = moleculePairs.get(clickedAtom.id);
+                
+                // 遍历所有原子找到partner和当前原子，修改颜色
+                atoms.forEach(atom => {
+                    if (atom.id === clickedAtom.id || atom.id === partnerId) {
+                        // 修改材质颜色
+                        if (Array.isArray(atom.material)) {
+                            atom.material.forEach(mat => mat.color.set(currentColor));
+                        } else {
+                            atom.material.color.set(currentColor);
+                        }
+                    }
+                });
+            }
+        }
+        
+        // 同时监听鼠标点击和触摸事件
+        renderer.domElement.addEventListener('click', onPick);
+        renderer.domElement.addEventListener('touchstart', onPick, { passive: false });
+
+        // ========== 恢复所有分子颜色至初始深紫色 ==========
+        function resetAllColors() {
+            const resetColorHex = initialPurple;   // 0x4a2a6b
+            const resetColorObj = new THREE.Color(resetColorHex);
+            // 遍历所有原子，将其材质颜色设回初始紫色
+            atoms.forEach(atom => {
+                if (Array.isArray(atom.material)) {
+                    atom.material.forEach(mat => mat.color.set(resetColorObj));
+                } else {
+                    atom.material.color.set(resetColorObj);
+                }
+            });
+            // 可选: 视觉反馈不影响调色板当前选中颜色, 但保持当前选中颜色不变
+            // 为了体验，恢复后用户依然可以用当前选中的颜色继续涂色。
+            // 并且不影响调色板的 UI 高亮状态 (维持当前选中的颜色)
+        }
+
+        // ========== 选色板交互 (同时支持鼠标和触屏) ==========
+        const color1 = document.getElementById('color-1');
+        const color2 = document.getElementById('color-2');
+        const color3 = document.getElementById('color-3');
+        const resetBtn = document.getElementById('reset-colors');
+        const currentColorLabel = document.getElementById('current-color-label');
+        
+        // 移除所有selected类
+        function removeSelected() {
+            color1.classList.remove('selected');
+            color2.classList.remove('selected');
+            color3.classList.remove('selected');
+        }
+        
+        // 统一的事件处理函数
+        function handleColorSelect(colorHex, colorName, element) {
+            return function(event) {
+                event.preventDefault();
+                removeSelected();
+                element.classList.add('selected');
+                currentColor.setHex(colorHex);
+                currentColorLabel.textContent = colorName;
+                currentColorLabel.style.color = colorName === '深紫' ? '#4a2a6b' : (colorName === '深蓝' ? '#1a3a6b' : '#8b0000');
+            };
+        }
+        
+        color1.addEventListener('click', handleColorSelect(0x4a2a6b, '深紫', color1));
+        color1.addEventListener('touchstart', handleColorSelect(0x4a2a6b, '深紫', color1), { passive: false });
+        
+        color2.addEventListener('click', handleColorSelect(0x1a3a6b, '深蓝', color2));
+        color2.addEventListener('touchstart', handleColorSelect(0x1a3a6b, '深蓝', color2), { passive: false });
+        
+        color3.addEventListener('click', handleColorSelect(0x8b0000, '血红', color3));
+        color3.addEventListener('touchstart', handleColorSelect(0x8b0000, '血红', color3), { passive: false });
+        
+        // 恢复按钮逻辑 (轻薄开关)
+        function onReset(event) {
+            event.preventDefault();
+            resetAllColors();
+            // 轻反馈: 按钮瞬间轻微缩放通过css完成, 无需额外动作
+        }
+        resetBtn.addEventListener('click', onReset);
+        resetBtn.addEventListener('touchstart', onReset, { passive: false });
+
+        // 输出确认
+        console.log('✅ 极简触屏版：调色板右侧已添加极薄恢复开关，支持一键恢复所有分子颜色至深紫');
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

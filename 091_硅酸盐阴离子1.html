@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>硅酸盐阴离子1 - 可视四面体</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #ffffff; 
+            font-family: sans-serif;
+        }
+        
+        /* 顶部标题 */
+        #main-title {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* 底部开关容器 */
+        #controls {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: none; /* 容器本身不阻挡鼠标 */
+        }
+        
+        /* 开关 UI */
+        .toggle-label {
+            background: rgba(255, 255, 255, 0.85);
+            padding: 10px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #444;
+            cursor: pointer;
+            pointer-events: auto; /* 允许点击 */
+            user-select: none;
+            border: 1px solid #ddd;
+        }
+        
+        .toggle-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #66aaff; /* 蓝色高亮 */
+        }
+    </style>
+    <script src="libs/three.min.js"></script>
+    <script src="libs/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="main-title">硅酸盐阴离子1</div>
+
+    <div id="controls">
+        <label class="toggle-label">
+            <span>硅氧四面体面</span>
+            <input type="checkbox" id="toggleFaces" checked>
+        </label>
+    </div>
+
+    <script>
+        // 1. 基础场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // 【修改点】：将 Z 轴距离从 42 拉近到 32，放大图形
+        camera.position.set(0, 4, 32); 
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = false;
+        controls.autoRotate = false;
+        controls.target.set(0, 0, 0);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(10, 20, 20);
+        scene.add(dirLight);
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        backLight.position.set(-10, -10, -20);
+        scene.add(backLight);
+
+        // 参数与材质
+        const SI_RADIUS = 0.85;     
+        const O_RADIUS = 0.60;      
+        const BOND_RADIUS = 0.15;   
+        const SI_SI_DISTANCE = 6.0; 
+
+        const matSi = new THREE.MeshPhongMaterial({ color: 0x1a4b8c, shininess: 40 });
+        const matO = new THREE.MeshPhongMaterial({ color: 0xd32f2f, shininess: 40 });
+        const matBond = new THREE.MeshPhongMaterial({ color: 0x9e9e9e });
+        
+        const matTetra = new THREE.MeshPhongMaterial({ 
+            color: 0x66aaff,
+            transparent: true, 
+            opacity: 0.35,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        function createSphere(pos, radius, mat) {
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 32), mat);
+            mesh.position.copy(pos);
+            return mesh;
+        }
+
+        function createCylinder(p1, p2, radius, mat) {
+            const dir = new THREE.Vector3().subVectors(p2, p1);
+            const len = dir.length();
+            const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 12), mat);
+            mesh.position.copy(mid);
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            return mesh;
+        }
+
+        // 生成三角面
+        function createTriangleFace(o1, o2, o3, normalDir) {
+            const offset = 0.02;
+            const p1 = o1.clone().add(normalDir.clone().multiplyScalar(offset));
+            const p2 = o2.clone().add(normalDir.clone().multiplyScalar(offset));
+            const p3 = o3.clone().add(normalDir.clone().multiplyScalar(offset));
+
+            const v = [p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z];
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+            geometry.computeVertexNormals();
+            return new THREE.Mesh(geometry, matTetra);
+        }
+
+        // ==========================================
+        // 核心构建
+        // ==========================================
+        const ringGroup = new THREE.Group();
+        const numSides = 6;
+        const ringRadius = SI_SI_DISTANCE; 
+
+        // 计算6个硅坐标
+        const siPos = [];
+        for(let i = 0; i < numSides; i++) {
+            const angle = (i * 2 * Math.PI) / numSides - Math.PI / 3;
+            siPos.push(new THREE.Vector3(ringRadius * Math.cos(angle), ringRadius * Math.sin(angle), 0));
+        }
+
+        // 存储所有点的集合
+        const pointMap = {};
+        let siId = 1, bridgeOId = 7, terminalOId = 13;
+
+        for(let i = 0; i < numSides; i++) {
+            const curSi = siPos[i];
+            const prevSi = siPos[(i - 1 + numSides) % numSides];
+            const nextSi = siPos[(i + 1) % numSides];
+            
+            const midO_Prev = new THREE.Vector3().addVectors(curSi, prevSi).multiplyScalar(0.5);
+            const midO_Next = new THREE.Vector3().addVectors(curSi, nextSi).multiplyScalar(0.5);
+            
+            const outDir = new THREE.Vector3(curSi.x, curSi.y, 0).normalize();
+            const zDir = (i % 2 === 0) ? 2.5 : -2.5; 
+            
+            const tipO_Up = curSi.clone().add(outDir.clone().multiplyScalar(2.2)).add(new THREE.Vector3(0, 0, zDir));
+            const tipO_Down = curSi.clone().add(outDir.clone().multiplyScalar(2.2)).add(new THREE.Vector3(0, 0, -zDir));
+
+            pointMap[siId] = curSi;
+            if(i < numSides - 1) pointMap[bridgeOId] = midO_Next;
+            pointMap[terminalOId] = tipO_Up;
+            pointMap[terminalOId + 1] = tipO_Down;
+
+            const group = new THREE.Group();
+            group.add(createSphere(curSi, SI_RADIUS, matSi));
+            group.add(createSphere(midO_Prev, O_RADIUS, matO));
+            group.add(createSphere(midO_Next, O_RADIUS, matO));
+            group.add(createSphere(tipO_Up, O_RADIUS, matO));
+            group.add(createSphere(tipO_Down, O_RADIUS, matO));
+            
+            group.add(createCylinder(curSi, midO_Prev, BOND_RADIUS, matBond));
+            group.add(createCylinder(curSi, midO_Next, BOND_RADIUS, matBond));
+            group.add(createCylinder(curSi, tipO_Up, BOND_RADIUS, matBond));
+            group.add(createCylinder(curSi, tipO_Down, BOND_RADIUS, matBond));
+
+            ringGroup.add(group);
+
+            if (i < numSides - 1) bridgeOId++;
+            terminalOId += 2;
+            siId++;
+        }
+
+        // 记录最后的12号桥氧
+        const lastSi = siPos[numSides - 1];
+        const firstSi = siPos[0];
+        const midO_Last = new THREE.Vector3().addVectors(lastSi, firstSi).multiplyScalar(0.5);
+        pointMap[12] = midO_Last;
+        ringGroup.add(createSphere(midO_Last, O_RADIUS, matO)); 
+
+        // ==========================================
+        // 生成蓝膜
+        // ==========================================
+        const surfaceNormal = new THREE.Vector3(0, 0, 1);
+        const faceMeshes = []; // 存膜对象，用于开关控制
+
+        function addBlueShell(oId1, oId2, oId3, oId4) {
+            const o1 = pointMap[oId1];
+            const o2 = pointMap[oId2];
+            const o3 = pointMap[oId3];
+            const o4 = pointMap[oId4];
+
+            faceMeshes.push(createTriangleFace(o1, o2, o3, surfaceNormal));
+            faceMeshes.push(createTriangleFace(o1, o2, o4, surfaceNormal));
+            faceMeshes.push(createTriangleFace(o1, o3, o4, surfaceNormal));
+            faceMeshes.push(createTriangleFace(o2, o3, o4, surfaceNormal));
+        }
+
+        addBlueShell(12, 7, 13, 14);
+        addBlueShell(8, 7, 15, 16);
+        addBlueShell(9, 8, 17, 18);
+        addBlueShell(10, 9, 19, 20);
+        addBlueShell(11, 10, 21, 22);
+        addBlueShell(12, 11, 23, 24);
+
+        faceMeshes.forEach(mesh => ringGroup.add(mesh));
+        scene.add(ringGroup);
+
+        // 5. 开关交互逻辑
+        const toggleCheckbox = document.getElementById('toggleFaces');
+        toggleCheckbox.addEventListener('change', (event) => {
+            const isChecked = event.target.checked;
+            faceMeshes.forEach(mesh => {
+                mesh.visible = isChecked;
+            });
+        });
+
+        // 6. 渲染循环
+        function animate() {
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

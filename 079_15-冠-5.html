@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>15-冠-5</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #ffffff; }
+        #info {
+            position: absolute; bottom: 30px; width: 100%; text-align: center;
+            color: #333; font-family: sans-serif; font-size: 24px; font-weight: bold;
+            pointer-events: none;
+        }
+    </style>
+    </head>
+<body>
+    <div id="info">15-冠-5</div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // 【修改点】：将相机的 Z 轴距离从 10 拉远到 15，使初始画面变小
+        camera.position.set(-4, 2, 15);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = false;
+        controls.target.set(0, 0, 0);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const light = new THREE.DirectionalLight(0xffffff, 1.5);
+        light.position.set(5, 10, 7);
+        scene.add(light);
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        backLight.position.set(-5, 0, -5);
+        scene.add(backLight);
+
+        // 1. 构建主骨架原子位置
+        const atoms = [];
+        const radius = 3.0;
+        for (let i = 0; i < 15; i++) {
+            const angle = (i / 15) * Math.PI * 2 - Math.PI / 2;
+            const isOxygen = (i % 3 === 2);
+            const z = 0.3 * Math.sin(angle * 3 + (isOxygen ? 0.5 : 0));
+            atoms.push({
+                pos: new THREE.Vector3(radius * Math.cos(angle), radius * Math.sin(angle), z),
+                type: isOxygen ? 'O' : 'C'
+            });
+        }
+
+        // 2. 渲染主环原子
+        const matO = new THREE.MeshStandardMaterial({ color: 0xcc1111, roughness: 0.3 });
+        const matC = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.4 });
+        const matH = new THREE.MeshStandardMaterial({ color: 0x87CEEB, roughness: 0.1 });
+        const sphereGeo = new THREE.SphereGeometry(1, 32, 16);
+
+        // 物理真实尺寸 (碳 > 氧 > 氢)
+        const rO = 0.85; 
+        const rC = 0.95; 
+        const rH = 0.65; 
+
+        for (let i = 0; i < atoms.length; i++) {
+            const isOxygen = atoms[i].type === 'O';
+            const r = isOxygen ? rO : rC;
+            const mesh = new THREE.Mesh(sphereGeo, isOxygen ? matO : matC);
+            mesh.position.copy(atoms[i].pos);
+            mesh.scale.set(r, r, r);
+            scene.add(mesh);
+        }
+
+        // ==========================================
+        // 3. 生成氢原子 (四面体算法)
+        // ==========================================
+        const hGeo = new THREE.SphereGeometry(1, 16, 12);
+
+        for (let i = 0; i < atoms.length; i++) {
+            if (atoms[i].type !== 'C') continue;
+
+            const curr = atoms[i].pos;
+            const prev = atoms[(i - 1 + 15) % 15].pos;
+            const next = atoms[(i + 1) % 15].pos;
+
+            const vecPrev = new THREE.Vector3().copy(prev).sub(curr).normalize();
+            const vecNext = new THREE.Vector3().copy(next).sub(curr).normalize();
+            
+            const avgDir = new THREE.Vector3().copy(vecPrev).add(vecNext).normalize();
+            const normal = new THREE.Vector3().crossVectors(vecPrev, vecNext).normalize();
+
+            // 109.5度键角方向
+            const bondAngleFactor = 0.577;
+            
+            const dirH1 = new THREE.Vector3()
+                .addScaledVector(avgDir, -1.0)
+                .addScaledVector(normal, bondAngleFactor)
+                .normalize();
+
+            const dirH2 = new THREE.Vector3()
+                .addScaledVector(avgDir, -1.0)
+                .addScaledVector(normal, -bondAngleFactor)
+                .normalize();
+
+            const hPos1 = curr.clone().add(dirH1.multiplyScalar(1.4));
+            const hPos2 = curr.clone().add(dirH2.multiplyScalar(1.4));
+
+            const mesh1 = new THREE.Mesh(hGeo, matH);
+            mesh1.position.copy(hPos1);
+            mesh1.scale.set(rH, rH, rH);
+            scene.add(mesh1);
+
+            const mesh2 = new THREE.Mesh(hGeo, matH);
+            mesh2.position.copy(hPos2);
+            mesh2.scale.set(rH, rH, rH);
+            scene.add(mesh2);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

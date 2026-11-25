@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>金刚烷 · 3D分子模型</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: white; }
+        
+        /* 所有顶部文字板块已移除，右上角文本框已去除 */
+        
+        /* 底部控制面板 - 极薄设计 */
+        .control-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            margin: 0 auto;
+            width: fit-content;
+            max-width: 95vw;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            border: 1px solid #ddd;
+            border-radius: 24px;
+            padding: 4px 14px;
+            display: flex;
+            gap: 12px;
+            z-index: 200;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+            color: #1a2a3a;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            border-left: 3px solid #ffaa00;
+            font-size: 0.7rem;
+            pointer-events: auto;
+            line-height: 1;
+        }
+        
+        /* 滑块项 - 紧凑 */
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            min-width: 110px;
+        }
+        .slider-item label {
+            font-size: 0.55rem;
+            color: #2a405c;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+            margin-bottom: 1px;
+        }
+        .slider-item label span {
+            display: inline-block;
+            width: 5px;
+            height: 5px;
+            border-radius: 2px;
+            background: #3366cc;
+        }
+        .slider-item input {
+            width: 100%;
+            cursor: pointer;
+            background: #e0e5ec;
+            height: 3px;
+            border-radius: 4px;
+            accent-color: #3366cc;
+            touch-action: none;
+        }
+        .slider-item .value-badge {
+            font-size: 0.5rem;
+            color: #1a2a3a;
+            font-weight: 500;
+            background: #f0f2f5;
+            padding: 1px 6px;
+            border-radius: 16px;
+            border: 1px solid #ccc;
+            min-width: 32px;
+            text-align: center;
+            margin-top: 1px;
+        }
+        
+        /* 开关项 - 紧凑 */
+        .toggle-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            min-width: 90px;
+        }
+        .toggle-item label {
+            font-size: 0.55rem;
+            color: #2a405c;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+        }
+        .toggle-item label span {
+            display: inline-block;
+            width: 5px;
+            height: 5px;
+            border-radius: 2px;
+            background: #ffaa00;
+        }
+        .toggle-button {
+            background: white;
+            border: 1px solid #aaa;
+            color: #1a2a3a;
+            font-size: 0.6rem;
+            font-weight: 500;
+            padding: 2px 10px;
+            border-radius: 24px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.15s ease;
+            letter-spacing: 0.5px;
+            touch-action: manipulation;
+        }
+        .toggle-button.active {
+            background: #3366cc;
+            border-color: #3366cc;
+            color: white;
+        }
+        
+        /* 颜色选择器 - 紧凑，与重置按钮合并在一行 */
+        .color-picker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            min-width: 180px;
+        }
+        .color-picker label {
+            font-size: 0.55rem;
+            color: #2a405c;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .color-options {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .color-option {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 1.5px solid transparent;
+            transition: all 0.1s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            touch-action: manipulation;
+        }
+        .color-option.selected {
+            border-color: #000;
+            transform: scale(1.05);
+        }
+        .color-option.red { background: #8b0000; }
+        .color-option.green { background: #006400; }
+        .color-option.purple { background: #4b0082; }
+        .color-option.yellow { background: #ffaa00; }
+        .color-option.black { background: #000000; border: 1.5px solid #666; }
+        .color-option.darkblue { background: #001a66; }
+        
+        /* 重置按钮样式 - 极薄简洁 */
+        .reset-btn {
+            background: white;
+            border: 1px solid #ccc;
+            color: #1a2a3a;
+            font-size: 0.6rem;
+            font-weight: 500;
+            padding: 2px 10px;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            touch-action: manipulation;
+            white-space: nowrap;
+            margin-left: 6px;
+            line-height: 1.2;
+        }
+        .reset-btn:hover {
+            background: #f0f2f5;
+            border-color: #999;
+        }
+        .reset-btn:active {
+            background: #e0e5ec;
+        }
+        
+        .instruction {
+            font-size: 0.5rem;
+            color: #888;
+            margin-top: 1px;
+            text-align: center;
+            background: transparent;
+            padding: 1px 4px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        
+        /* 移动端适配 */
+        @media (max-width: 800px) {
+            .control-panel {
+                flex-direction: column;
+                gap: 5px;
+                width: 92%;
+                padding: 6px 12px;
+                border-radius: 20px;
+                bottom: 8px;
+            }
+            .slider-item, .toggle-item, .color-picker {
+                min-width: 100%;
+                width: 100%;
+            }
+            .color-option {
+                width: 28px;
+                height: 28px;
+            }
+            .slider-item input {
+                height: 4px;
+            }
+            .toggle-button {
+                padding: 4px 10px;
+            }
+            .reset-btn {
+                padding: 4px 10px;
+                margin-left: 0;
+                margin-top: 2px;
+            }
+            .color-options {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 所有文本框已移除，包括右上角图例和右下角轴提示 -->
+
+    <!-- 底部控制面板 - 极薄设计 -->
+    <div class="control-panel">
+        <!-- 显示/隐藏氢原子按钮 -->
+        <div class="toggle-item">
+            <label><span></span> 氢</label>
+            <button id="toggleHydrogen" class="toggle-button active">● 显示</button>
+        </div>
+        
+        <!-- 绕Z轴旋转滑块 -->
+        <div class="slider-item">
+            <label><span></span> 自转</label>
+            <input type="range" id="rotateZ" min="0" max="360" value="0" step="0.1">
+            <span class="value-badge" id="rotateZ-value">0°</span>
+        </div>
+        
+        <!-- 颜色选择器 + 重置按钮整合在同一区域，保持薄框风格 -->
+        <div class="color-picker">
+            <label>🎨 颜色</label>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;">
+                <div class="color-options">
+                    <div class="color-option red selected" id="color-red" title="深红"></div>
+                    <div class="color-option green" id="color-green" title="深绿"></div>
+                    <div class="color-option purple" id="color-purple" title="深紫"></div>
+                    <div class="color-option yellow" id="color-yellow" title="亮黄"></div>
+                    <div class="color-option black" id="color-black" title="黑"></div>
+                    <div class="color-option darkblue" id="color-darkblue" title="深蓝"></div>
+                </div>
+                <button id="resetColorsBtn" class="reset-btn">↺ 重置</button>
+            </div>
+            <div class="instruction">点色块→点原子 | 重置恢复默认</div>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 (白底) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // 调整相机位置，让图形初始显示更小一些
+        camera.position.set(8, 5, 10);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器 (360°纵向旋转) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.set(0, 0, 0);
+        controls.maxPolarAngle = Math.PI;
+        controls.minPolarAngle = 0;
+        controls.touchRotate = true;
+        controls.touchZoom = true;
+        controls.touchPan = true;
+
+        // ========== 灯光系统 ==========
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        scene.add(ambientLight);
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+        light1.position.set(3, 5, 5);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffffff, 1.0);
+        light2.position.set(-4, 3, -4);
+        scene.add(light2);
+
+        const light3 = new THREE.PointLight(0xffffff, 0.7);
+        light3.position.set(2, 2, 3);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 0.6);
+        light4.position.set(-3, -2, 4);
+        scene.add(light4);
+
+        const light5 = new THREE.PointLight(0xffffff, 0.5);
+        light5.position.set(0, 3, -8);
+        scene.add(light5);
+
+        // ========== 构建金刚烷碳骨架 ==========
+        // 缩小分子整体比例，让初始显示更小
+        const baseScale = 1.6;
+        const lengthFactor = 4/3;
+        const scale = baseScale * lengthFactor;
+
+        const carbonPos = [
+            new THREE.Vector3(0.578, 0.578, 0.578).multiplyScalar(scale),
+            new THREE.Vector3(0.578, -0.578, -0.578).multiplyScalar(scale),
+            new THREE.Vector3(-0.578, 0.578, -0.578).multiplyScalar(scale),
+            new THREE.Vector3(-0.578, -0.578, 0.578).multiplyScalar(scale),
+            new THREE.Vector3(1.155, 0, 0).multiplyScalar(scale),
+            new THREE.Vector3(-1.155, 0, 0).multiplyScalar(scale),
+            new THREE.Vector3(0, 1.155, 0).multiplyScalar(scale),
+            new THREE.Vector3(0, -1.155, 0).multiplyScalar(scale),
+            new THREE.Vector3(0, 0, 1.155).multiplyScalar(scale),
+            new THREE.Vector3(0, 0, -1.155).multiplyScalar(scale)
+        ];
+
+        const carbonNeighbors = [
+            [4, 6, 8], [4, 7, 9], [5, 6, 9], [5, 7, 8],
+            [0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]
+        ];
+
+        // ========== 生成氢原子 ==========
+        const bondLengthCH = 0.88 * scale;
+        const hydrogenData = [];
+
+        const center = new THREE.Vector3(0, 0, 0);
+        carbonPos.forEach(pos => center.add(pos));
+        center.divideScalar(carbonPos.length);
+
+        const tetraAngle = Math.acos(-1/3);
+        const halfTetra = tetraAngle / 2;
+        const cosHalf = Math.cos(halfTetra);
+        const sinHalf = Math.sin(halfTetra);
+
+        carbonNeighbors.forEach((neighbors, idx) => {
+            const cPos = carbonPos[idx];
+            
+            if (neighbors.length === 3) {
+                const neighborVectors = neighbors.map(n => carbonPos[n].clone().sub(cPos).normalize());
+                const sumDir = new THREE.Vector3(0, 0, 0);
+                neighborVectors.forEach(v => sumDir.add(v));
+                const hDir = sumDir.clone().negate().normalize();
+                const hPos = cPos.clone().add(hDir.multiplyScalar(bondLengthCH));
+                hydrogenData.push({ carbonIdx: idx, pos: hPos });
+            } 
+            else if (neighbors.length === 2) {
+                const v1 = carbonPos[neighbors[0]].clone().sub(cPos).normalize();
+                const v2 = carbonPos[neighbors[1]].clone().sub(cPos).normalize();
+                const n_ccc = new THREE.Vector3().crossVectors(v1, v2).normalize();
+                const toCenter = new THREE.Vector3().subVectors(center, cPos).normalize();
+                const bisector = new THREE.Vector3().addVectors(v1, v2).normalize();
+                
+                let outwardBisector;
+                if (bisector.dot(toCenter) > 0) {
+                    outwardBisector = bisector.clone().negate();
+                } else {
+                    outwardBisector = bisector.clone();
+                }
+                
+                const h1 = new THREE.Vector3().addVectors(
+                    outwardBisector.clone().multiplyScalar(cosHalf),
+                    n_ccc.clone().multiplyScalar(sinHalf)
+                ).normalize();
+                
+                const h2 = new THREE.Vector3().addVectors(
+                    outwardBisector.clone().multiplyScalar(cosHalf),
+                    n_ccc.clone().multiplyScalar(-sinHalf)
+                ).normalize();
+                
+                const h1Pos = cPos.clone().add(h1.multiplyScalar(bondLengthCH));
+                const h2Pos = cPos.clone().add(h2.multiplyScalar(bondLengthCH));
+                
+                hydrogenData.push({ carbonIdx: idx, pos: h1Pos });
+                hydrogenData.push({ carbonIdx: idx, pos: h2Pos });
+            }
+        });
+
+        // ========== 材质 ==========
+        // 默认颜色：碳原子黑色，氢原子深蓝色，C-C键灰色，C-H键金色
+        const defaultCarbonColor = 0x000000;
+        const defaultHydrogenColor = 0x001a66;
+        
+        const carbonMat = new THREE.MeshPhongMaterial({ color: defaultCarbonColor, shininess: 40, specular: 0x222222 });
+        const hydrogenMat = new THREE.MeshPhongMaterial({ color: defaultHydrogenColor, shininess: 45, specular: 0x333333 });
+        const bondCCMat = new THREE.MeshPhongMaterial({ color: 0x555555, shininess: 30, specular: 0x222222 });
+        const bondCHMat = new THREE.MeshPhongMaterial({ color: 0xffaa00, shininess: 30, specular: 0x442200 });
+
+        const atomRadiusC = 0.2 * scale;
+        const atomRadiusH = 0.12 * scale;
+        const bondRadiusCC = 0.04 * scale;
+        const bondRadiusCH = 0.028 * scale;
+
+        // ========== 构建分子组 ==========
+        const moleculeGroup = new THREE.Group();
+        const clickableAtoms = [];
+        const carbonSpheres = [];    // 存储碳球体用于重置
+        const hydrogenSpheres = [];  // 存储氢球体用于重置
+
+        carbonPos.forEach((pos, index) => {
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(atomRadiusC, 48, 32), carbonMat.clone());
+            sphere.position.copy(pos);
+            sphere.userData = { type: 'carbon', index: index };
+            moleculeGroup.add(sphere);
+            clickableAtoms.push(sphere);
+            carbonSpheres.push(sphere);
+        });
+
+        const bondsCC = [
+            [0, 4], [0, 6], [0, 8], [1, 4], [1, 7], [1, 9],
+            [2, 5], [2, 6], [2, 9], [3, 5], [3, 7], [3, 8]
+        ];
+
+        bondsCC.forEach(([i, j]) => {
+            const p1 = carbonPos[i];
+            const p2 = carbonPos[j];
+            const start = p1.clone();
+            const end = p2.clone();
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const distance = direction.length();
+            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(bondRadiusCC, bondRadiusCC, distance, 10),
+                bondCCMat
+            );
+            cylinder.position.copy(midPoint);
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+            moleculeGroup.add(cylinder);
+        });
+
+        hydrogenData.forEach(({ pos }, index) => {
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(atomRadiusH, 36, 24), hydrogenMat.clone());
+            sphere.position.copy(pos);
+            sphere.userData = { type: 'hydrogen', index: index };
+            moleculeGroup.add(sphere);
+            clickableAtoms.push(sphere);
+            hydrogenSpheres.push(sphere);
+        });
+
+        const hydrogenBonds = [];
+        hydrogenData.forEach(({ carbonIdx, pos: hPos }) => {
+            const cPos = carbonPos[carbonIdx];
+            const start = cPos.clone();
+            const end = hPos.clone();
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const distance = direction.length();
+            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(bondRadiusCH, bondRadiusCH, distance, 8),
+                bondCHMat
+            );
+            cylinder.position.copy(midPoint);
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+            moleculeGroup.add(cylinder);
+            hydrogenBonds.push(cylinder);
+        });
+
+        // ========== 恢复原始坐标轴 (带方向箭头的三轴) ==========
+        const axisGroup = new THREE.Group();
+        // 基于碳原子C0的方向来定义Z轴方向
+        const zTarget = carbonPos[0].clone().normalize();
+        const quatZ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), zTarget);
+        axisGroup.quaternion.copy(quatZ);
+        
+        const axisLength = 2.5;
+        const headLength = 0.3;
+        const headWidth = 0.15;
+
+        // X轴 - 红色
+        const xAxis = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), axisLength, 0xff5555, headLength, headWidth);
+        // Y轴 - 绿色
+        const yAxis = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), axisLength, 0x55ff55, headLength, headWidth);
+        // Z轴 - 蓝色
+        const zAxis = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), axisLength, 0x3366cc, headLength, headWidth);
+        
+        axisGroup.add(xAxis);
+        axisGroup.add(yAxis);
+        axisGroup.add(zAxis);
+        moleculeGroup.add(axisGroup);
+
+        scene.add(moleculeGroup);
+
+        // ========== 固定Z轴旋转逻辑 ==========
+        const fixedZAxis = carbonPos[0].clone().normalize();
+        const sliderZ = document.getElementById('rotateZ');
+        const spanZ = document.getElementById('rotateZ-value');
+        let angleZ = 0;
+
+        function updateRotation() {
+            const radZ = THREE.MathUtils.degToRad(angleZ);
+            const qFixedZ = new THREE.Quaternion().setFromAxisAngle(fixedZAxis, radZ);
+            const qWorldY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+            moleculeGroup.quaternion.copy(qWorldY.multiply(qFixedZ));
+        }
+
+        updateRotation();
+        spanZ.textContent = angleZ.toFixed(1) + '°';
+
+        sliderZ.addEventListener('input', (e) => {
+            angleZ = parseFloat(e.target.value);
+            spanZ.textContent = angleZ.toFixed(1) + '°';
+            updateRotation();
+        });
+
+        // ========== 氢原子显示/隐藏 ==========
+        const toggleButton = document.getElementById('toggleHydrogen');
+        let hydrogenVisible = true;
+        
+        toggleButton.addEventListener('click', () => {
+            hydrogenVisible = !hydrogenVisible;
+            hydrogenSpheres.forEach(sphere => { sphere.visible = hydrogenVisible; });
+            hydrogenBonds.forEach(bond => { bond.visible = hydrogenVisible; });
+            toggleButton.textContent = hydrogenVisible ? '● 显示' : '○ 隐藏';
+            toggleButton.classList.toggle('active', hydrogenVisible);
+        });
+        toggleButton.addEventListener('touchstart', (e) => { e.preventDefault(); toggleButton.click(); });
+
+        // ========== 颜色选择器 ==========
+        const colorOptions = {
+            red: 0x8b0000, green: 0x006400, purple: 0x4b0082,
+            yellow: 0xffaa00, black: 0x000000, darkblue: 0x001a66
+        };
+        let selectedColor = 0x8b0000;
+        
+        function handleColorSelection(colorName, colorHex) {
+            return function(event) {
+                event.preventDefault();
+                selectedColor = colorHex;
+                document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+                document.getElementById(`color-${colorName}`).classList.add('selected');
+            };
+        }
+        
+        ['red','green','purple','yellow','black','darkblue'].forEach(c => {
+            const el = document.getElementById(`color-${c}`);
+            el.addEventListener('click', handleColorSelection(c, colorOptions[c]));
+            el.addEventListener('touchstart', handleColorSelection(c, colorOptions[c]), { passive: false });
+        });
+
+        // ========== 重置所有分子颜色至默认 ==========
+        const resetBtn = document.getElementById('resetColorsBtn');
+        
+        function resetAllColors() {
+            // 重置所有碳原子颜色为黑色
+            carbonSpheres.forEach(sphere => {
+                sphere.material.color.setHex(defaultCarbonColor);
+                sphere.material.emissive.setHex(0x000000);
+                sphere.material.emissiveIntensity = 0;
+            });
+            // 重置所有氢原子颜色为深蓝色
+            hydrogenSpheres.forEach(sphere => {
+                sphere.material.color.setHex(defaultHydrogenColor);
+                sphere.material.emissive.setHex(0x000000);
+                sphere.material.emissiveIntensity = 0;
+            });
+        }
+        
+        resetBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            resetAllColors();
+        });
+        resetBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            resetAllColors();
+        });
+
+        // ========== 射线检测器 ==========
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        function onAtomPick(event) {
+            event.preventDefault();
+            const rect = renderer.domElement.getBoundingClientRect();
+            let clientX, clientY;
+            if (event.touches) {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+            
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableAtoms);
+            
+            if (intersects.length > 0) {
+                const hitAtom = intersects[0].object;
+                hitAtom.material.color.setHex(selectedColor);
+                hitAtom.material.emissive.setHex(selectedColor);
+                hitAtom.material.emissiveIntensity = 0.25;
+                setTimeout(() => {
+                    hitAtom.material.emissive.setHex(0x000000);
+                    hitAtom.material.emissiveIntensity = 0;
+                }, 100);
+            }
+        }
+        
+        renderer.domElement.addEventListener('click', onAtomPick);
+        renderer.domElement.addEventListener('touchstart', onAtomPick, { passive: false });
+
+        // ========== 动画 ==========
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>环戊二烯 · 点击 H 换成彩球</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: white;
+            touch-action: none;
+            position: fixed;
+            width: 100%; height: 100%;
+            -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+        }
+        canvas { display: block; touch-action: none; }
+
+        /* 顶部提示 */
+        #touch-hint {
+            position: absolute;
+            top: max(14px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            padding: 6px 16px;
+            border-radius: 30px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            color: #555;
+            z-index: 100;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+            max-width: calc(100vw - 24px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ============================================================
+           底部控制面板：6 色选择器
+           ============================================================ */
+        #bottom-panel {
+            position: absolute;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid #ccc;
+            border-radius: 22px;
+            padding: 8px 14px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 8px 12px;
+            z-index: 200;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            pointer-events: auto;
+        }
+
+        .color-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .picker-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            white-space: nowrap;
+        }
+        .color-dots {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .color-dot {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.9);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: transform 0.12s, box-shadow 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        .color-dot:active { transform: scale(0.88); }
+        .color-dot.active {
+            border: 3px solid #1a1a1a;
+            transform: scale(1.12);
+            box-shadow: 0 0 0 2px #ffd966;
+        }
+
+        /* ============================================================
+           触屏设备（粗指针）: 加大点击目标
+           ============================================================ */
+        @media (pointer: coarse) {
+            .color-dot { width: 34px; height: 34px; }
+            #bottom-panel { padding: 10px 14px; }
+        }
+
+        /* ============================================================
+           窄屏: 控制面板铺满宽度
+           ============================================================ */
+        @media (max-width: 720px) {
+            #bottom-panel {
+                width: calc(100vw - 16px);
+                padding: 10px 12px;
+                gap: 8px;
+                border-radius: 18px;
+            }
+            .color-picker {
+                width: 100%;
+                justify-content: center;
+            }
+            .color-dots { gap: 8px; }
+            #touch-hint { font-size: 11px; padding: 4px 12px; top: 12px; }
+        }
+
+        @media (max-width: 420px) {
+            #bottom-panel { padding: 8px 10px; }
+            .color-dot { width: 28px; height: 28px; }
+            .color-dots { gap: 6px; }
+        }
+    </style>
+    </head>
+<body>
+    <div id="touch-hint">👆 点击氢原子 → 变为所选颜色球 · 再点变回氢</div>
+
+    <div id="bottom-panel">
+        <div class="color-picker">
+            <span class="picker-label">H →</span>
+            <div class="color-dots">
+                <div class="color-dot active" data-color="red"    title="红色" style="background:#ff4444;"></div>
+                <div class="color-dot" data-color="yellow" title="黄色" style="background:#ffcc00;"></div>
+                <div class="color-dot" data-color="green"  title="绿色" style="background:#44dd88;"></div>
+                <div class="color-dot" data-color="blue"   title="蓝色" style="background:#2196f3;"></div>
+                <div class="color-dot" data-color="purple" title="紫色" style="background:#9b59b6;"></div>
+                <div class="color-dot" data-color="black"  title="黑色" style="background:#000000;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // --- 相机 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(3.5, 2.5, 5.5);
+        camera.lookAt(0, 0, 0);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.set(0, 0, 0);
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        controls.update();
+
+        // --- 光源（保留原 4 个） ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 0.9);
+        light1.position.set(2, 4, 3);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffffff, 0.6);
+        light2.position.set(-3, 2, 1);
+        scene.add(light2);
+
+        const light3 = new THREE.PointLight(0xffffff, 0.5);
+        light3.position.set(1, 1, -4);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 0.4);
+        light4.position.set(4, 1, -1);
+        scene.add(light4);
+
+        // ========== 构建对称环戊二烯（保持原几何全部计算） ==========
+        const R = 1.28;
+        const baseAngle = -18 * Math.PI / 180;
+
+        const carbonPositions = [];
+        for (let i = 0; i < 5; i++) {
+            const theta = i * 72 * Math.PI / 180 + baseAngle;
+            carbonPositions.push(new THREE.Vector3(R * Math.cos(theta), R * Math.sin(theta), 0));
+        }
+
+        const originalPositions = carbonPositions.map(p => p.clone());
+        const doubleBondShortenFactor = 0.94;
+
+        const dirC1C2 = new THREE.Vector3().subVectors(originalPositions[1], originalPositions[0]).normalize();
+        const shortenOffset12 = dirC1C2.multiplyScalar(R * (1 - doubleBondShortenFactor) * 0.5);
+        carbonPositions[0] = originalPositions[0].clone().add(shortenOffset12);
+        carbonPositions[1] = originalPositions[1].clone().sub(shortenOffset12);
+
+        const dirC3C4 = new THREE.Vector3().subVectors(originalPositions[3], originalPositions[2]).normalize();
+        const shortenOffset34 = dirC3C4.multiplyScalar(R * (1 - doubleBondShortenFactor) * 0.5);
+        carbonPositions[2] = originalPositions[2].clone().add(shortenOffset34);
+        carbonPositions[3] = originalPositions[3].clone().sub(shortenOffset34);
+
+        const chBondLength = 0.85;
+
+        function getSp2HydrogenDirection(cPos, prevCPos, nextCPos) {
+            const v1 = new THREE.Vector3().subVectors(prevCPos, cPos).normalize();
+            const v2 = new THREE.Vector3().subVectors(nextCPos, cPos).normalize();
+            return new THREE.Vector3().addVectors(v1, v2).normalize().negate();
+        }
+
+        const c5Pos = carbonPositions[4];
+        const c4Pos = carbonPositions[3];
+        const c1Pos = carbonPositions[0];
+        const dirC5toC4 = new THREE.Vector3().subVectors(c4Pos, c5Pos).normalize();
+        const dirC5toC1 = new THREE.Vector3().subVectors(c1Pos, c5Pos).normalize();
+        const outward = new THREE.Vector3().addVectors(dirC5toC4, dirC5toC1).normalize().negate();
+        const zAxis = new THREE.Vector3(0, 0, 1);
+        const h5aDir = new THREE.Vector3().addVectors(outward, zAxis.clone().multiplyScalar(1.2)).normalize();
+        const h5bDir = new THREE.Vector3().addVectors(outward, zAxis.clone().multiplyScalar(-1.2)).normalize();
+
+        const hydrogenPositions = [
+            carbonPositions[0].clone().add(getSp2HydrogenDirection(carbonPositions[0], carbonPositions[4], carbonPositions[1]).multiplyScalar(chBondLength)),
+            carbonPositions[1].clone().add(getSp2HydrogenDirection(carbonPositions[1], carbonPositions[0], carbonPositions[2]).multiplyScalar(chBondLength)),
+            carbonPositions[2].clone().add(getSp2HydrogenDirection(carbonPositions[2], carbonPositions[1], carbonPositions[3]).multiplyScalar(chBondLength)),
+            carbonPositions[3].clone().add(getSp2HydrogenDirection(carbonPositions[3], carbonPositions[2], carbonPositions[4]).multiplyScalar(chBondLength)),
+            c5Pos.clone().add(h5aDir.multiplyScalar(chBondLength)),
+            c5Pos.clone().add(h5bDir.multiplyScalar(chBondLength))
+        ];
+
+        // --- 材质（保持原样） ---
+        const carbonMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a, roughness: 0.35, metalness: 0.1
+        });
+        const hydrogenMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a2b5c, roughness: 0.45, metalness: 0.05
+        });
+        const bondMaterial = new THREE.MeshStandardMaterial({
+            color: 0x888888, roughness: 0.55, metalness: 0.05
+        });
+
+        // ============================================================
+        // 原子半径（保持原值 C=0.28, H=0.18；彩球 0.22，比 H 稍大、比 C 小）
+        // ============================================================
+        const RADII = { C: 0.28, H: 0.18, colored: 0.22 };
+
+        const COLOR_VALUES = {
+            red:    0xff4444,
+            yellow: 0xffcc00,
+            green:  0x44dd88,
+            blue:   0x2196f3,
+            purple: 0x9b59b6,
+            black:  0x000000
+        };
+        const coloredMaterials = {};
+        Object.keys(COLOR_VALUES).forEach(key => {
+            coloredMaterials[key] = new THREE.MeshStandardMaterial({
+                color: COLOR_VALUES[key], roughness: 0.35, metalness: 0.1
+            });
+        });
+
+        const bondRadius = 0.045;
+
+        const sphereGeomC = new THREE.SphereGeometry(RADII.C, 36, 18);
+        const sphereGeomH = new THREE.SphereGeometry(RADII.H, 32, 16);
+        const sphereGeomColored = new THREE.SphereGeometry(RADII.colored, 32, 16);
+
+        // 通用：创建圆柱键（返回 mesh，方便后续管理）
+        function createBondMesh(posFrom, posTo, material, radius) {
+            const direction = new THREE.Vector3().subVectors(posTo, posFrom);
+            const length = direction.length();
+            const geometry = new THREE.CylinderGeometry(radius, radius, length, 6);
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.copy(new THREE.Vector3().addVectors(posFrom, posTo).multiplyScalar(0.5));
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+            return mesh;
+        }
+
+        // ============================================================
+        // 可替换原子管理
+        //   所有原子都在 scene 里，parent 就是 scene
+        // ============================================================
+        const clickableAtoms = [];
+        const switchableAtoms = [];
+
+        function createAtomRecord(type, cPos, hPos, colorKey) {
+            let mesh;
+            if (type === 'H') {
+                mesh = new THREE.Mesh(sphereGeomH, hydrogenMaterial);
+            } else {
+                mesh = new THREE.Mesh(sphereGeomColored, coloredMaterials[colorKey]);
+            }
+            mesh.position.copy(hPos);
+            scene.add(mesh);
+            clickableAtoms.push(mesh);
+
+            const bond = createBondMesh(cPos, hPos, bondMaterial, bondRadius * 0.85);
+            scene.add(bond);
+
+            const record = {
+                mesh, bond,
+                parent: scene,
+                cPos: cPos.clone(),
+                hPos: hPos.clone(),
+                type,
+                colorKey: colorKey || null
+            };
+            switchableAtoms.push(record);
+            return record;
+        }
+
+        function swapAtom(record, newType, colorKey) {
+            scene.remove(record.mesh);
+            scene.remove(record.bond);
+            record.mesh.geometry.dispose();
+            // 注意：共享的 geometry 不要 dispose，只解除引用。这里 geometry 是共享的，跳过 dispose。
+
+            const ci = clickableAtoms.indexOf(record.mesh);
+            if (ci > -1) clickableAtoms.splice(ci, 1);
+
+            let newMesh;
+            if (newType === 'H') {
+                newMesh = new THREE.Mesh(sphereGeomH, hydrogenMaterial);
+            } else {
+                newMesh = new THREE.Mesh(sphereGeomColored, coloredMaterials[colorKey]);
+            }
+            newMesh.position.copy(record.hPos);
+            scene.add(newMesh);
+            clickableAtoms.push(newMesh);
+
+            const newBond = createBondMesh(record.cPos, record.hPos, bondMaterial, bondRadius * 0.85);
+            scene.add(newBond);
+
+            record.mesh = newMesh;
+            record.bond = newBond;
+            record.type = newType;
+            record.colorKey = newType === 'H' ? null : colorKey;
+        }
+
+        // --- 碳原子（黑色，不可点击） ---
+        carbonPositions.forEach(pos => {
+            const sphere = new THREE.Mesh(sphereGeomC, carbonMaterial);
+            sphere.position.copy(pos);
+            scene.add(sphere);
+        });
+
+        // --- 6 个可替换氢原子 ---
+        // C1~C4 各 1 个
+        for (let i = 0; i < 4; i++) {
+            createAtomRecord('H', carbonPositions[i], hydrogenPositions[i], null);
+        }
+        // C5 上 2 个
+        createAtomRecord('H', c5Pos, hydrogenPositions[4], null);
+        createAtomRecord('H', c5Pos, hydrogenPositions[5], null);
+
+        // --- 碳-碳键（保持原双键/单键样式） ---
+        const ccPairs = [[0,1], [1,2], [2,3], [3,4], [4,0]];
+        const normalZ = new THREE.Vector3(0, 0, 1);
+        const doubleBondOffset = 0.07;
+
+        ccPairs.forEach(([i, j]) => {
+            const p1 = carbonPositions[i];
+            const p2 = carbonPositions[j];
+            const isDouble = (i === 0 && j === 1) || (i === 1 && j === 0) || (i === 2 && j === 3) || (i === 3 && j === 2);
+
+            if (isDouble) {
+                const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
+                const perp = new THREE.Vector3().crossVectors(dir, normalZ).normalize();
+                const offsetVec = perp.multiplyScalar(doubleBondOffset);
+                scene.add(createBondMesh(p1.clone().add(offsetVec), p2.clone().add(offsetVec), bondMaterial, bondRadius * 0.9));
+                scene.add(createBondMesh(p1.clone().add(offsetVec.clone().negate()), p2.clone().add(offsetVec.clone().negate()), bondMaterial, bondRadius * 0.9));
+            } else {
+                scene.add(createBondMesh(p1, p2, bondMaterial, bondRadius));
+            }
+        });
+
+        // ============================================================
+        // 颜色选择器
+        // ============================================================
+        let selectedColorKey = 'red';
+        const colorDots = document.querySelectorAll('.color-dot');
+        colorDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                selectedColorKey = dot.dataset.color;
+                colorDots.forEach(d => d.classList.remove('active'));
+                dot.classList.add('active');
+            });
+        });
+
+        // ============================================================
+        // 拾取：射线优先，触屏 45px 屏幕空间 fallback
+        // ============================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function doPick(clientX, clientY, pointerType) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(clickableAtoms, false);
+
+            let hitMesh = null;
+            if (intersects.length > 0) {
+                hitMesh = intersects[0].object;
+            } else if (pointerType !== 'mouse') {
+                // 触屏 fallback：屏幕空间 45px 内最近的可点击原子
+                const v = new THREE.Vector3();
+                let best = null, bestDist = 45;
+                clickableAtoms.forEach(atom => {
+                    atom.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = atom; }
+                });
+                if (best) hitMesh = best;
+            }
+
+            if (!hitMesh) return;
+
+            const record = switchableAtoms.find(r => r.mesh === hitMesh);
+            if (!record) return;
+
+            if (record.type === 'H') {
+                swapAtom(record, 'colored', selectedColorKey);
+            } else {
+                swapAtom(record, 'H');
+            }
+        }
+
+        // ============================================================
+        // 触屏 / 鼠标 点击识别（三段式）
+        // ============================================================
+        const activePointers = new Set();
+        let pointerDownInfo = null;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                pointerDownInfo = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch',
+                    id: e.pointerId
+                };
+            } else {
+                pointerDownInfo = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!pointerDownInfo || pointerDownInfo.id !== e.pointerId || activePointers.size !== 1) return;
+            const dx = e.clientX - pointerDownInfo.x;
+            const dy = e.clientY - pointerDownInfo.y;
+            const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+            if (dx * dx + dy * dy > thr * thr) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const countBeforeUp = activePointers.size;
+            if (pointerDownInfo && pointerDownInfo.id === e.pointerId && countBeforeUp === 1) {
+                const dx = e.clientX - pointerDownInfo.x;
+                const dy = e.clientY - pointerDownInfo.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = performance.now() - pointerDownInfo.t;
+                const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+                if (dist <= thr && dt <= 500) {
+                    doPick(e.clientX, e.clientY, pointerDownInfo.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            pointerDownInfo = null;
+        });
+
+        // iOS Safari 页面级双指缩放拦截
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        // 控制面板阻止事件冒泡到 canvas
+        const bottomPanel = document.getElementById('bottom-panel');
+        bottomPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+        bottomPanel.addEventListener('pointermove', (e) => e.stopPropagation());
+
+        // ============================================================
+        // 相机自适应（横竖屏 / 窄屏）
+        //   内容：环戊二烯半径 1.28 + C-H 键 0.85 + 彩球 0.22 ≈ 4.7
+        //   加边距约 5.5
+        // ============================================================
+        function updateCameraZoom() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const dist = camera.position.distanceTo(controls.target);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+            const baseVisibleH = 2 * dist * Math.tan(fovRad);
+            const baseVisibleW = baseVisibleH * aspect;
+
+            const contentW = 5.5;
+            const contentH = 5.5;
+
+            const zoomForW = baseVisibleW / contentW;
+            const zoomForH = baseVisibleH / contentH;
+
+            const isLandscape = aspect > 1;
+            const maxZoom = isLandscape ? 1.0 : 0.95;
+            const minZoom = isLandscape ? 0.55 : 0.30;
+
+            camera.zoom = Math.max(minZoom, Math.min(maxZoom, zoomForW, zoomForH));
+            camera.updateProjectionMatrix();
+        }
+        updateCameraZoom();
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 窗口 / 屏幕变化 ---
+        let resizeTimer = null;
+        function onWindowResize() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                updateCameraZoom();
+            }, 60);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 300));
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onWindowResize);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

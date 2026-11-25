@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+    <title>乙烷 (C₂H₆) - 白底灰键 · 点击 H ⇄ Cl / Br</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #ffffff;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            font-family: 'Arial', 'Segoe UI', sans-serif;
+        }
+        canvas { display: block; touch-action: none; }
+
+        #controls-panel {
+            position: absolute;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            color: #333;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 26px;
+            border: 1px solid #dddddd;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            z-index: 200;
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            padding: 10px 20px;
+            max-width: calc(100vw - 24px);
+            box-sizing: border-box;
+        }
+
+        #controls-panel label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: #555;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        #controls-panel input[type="range"] {
+            width: 220px;
+            cursor: pointer;
+            background: #e0e0e0;
+            height: 4px;
+            border-radius: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+            touch-action: none;
+        }
+        #controls-panel input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #88bbff;
+            cursor: grab;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: transform 0.1s;
+        }
+        #controls-panel input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.15);
+        }
+        #controls-panel input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #88bbff;
+            border: 2px solid white;
+            cursor: grab;
+        }
+
+        #angle-value {
+            min-width: 60px;
+            text-align: center;
+            color: #88bbff;
+            font-weight: bold;
+            font-size: 14px;
+            background: #f5f5f5;
+            padding: 4px 12px;
+            border-radius: 30px;
+            border: 1px solid #dddddd;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .halogen-picker {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding-left: 12px;
+            border-left: 1px solid #eee;
+        }
+        .picker-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .halogen-btn {
+            background: #f2f2f2;
+            border: 1px solid #cccccc;
+            color: #333;
+            padding: 5px 12px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            min-height: 32px;
+            white-space: nowrap;
+            transition: all 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .halogen-btn:hover  { background: #e6e6e6; }
+        .halogen-btn:active { transform: scale(0.96); }
+        .halogen-btn.active[data-halogen="Cl"] {
+            background: #44dd88;
+            color: #ffffff;
+            border-color: #2bc067;
+            box-shadow: 0 1px 6px rgba(68, 221, 136, 0.5);
+        }
+        .halogen-btn.active[data-halogen="Br"] {
+            background: #9a3a1d;
+            color: #ffffff;
+            border-color: #7a2c15;
+            box-shadow: 0 1px 6px rgba(154, 58, 29, 0.5);
+        }
+
+        #click-hint {
+            position: absolute;
+            top: max(20px, env(safe-area-inset-top));
+            right: max(20px, env(safe-area-inset-right));
+            color: #ff8844;
+            font-family: monospace;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 5px 14px;
+            border-radius: 40px;
+            border: 1px solid #ffaa66;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            pointer-events: none;
+            font-weight: 500;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+            white-space: nowrap;
+        }
+
+        @media (pointer: coarse) {
+            #controls-panel input[type="range"] { height: 8px; }
+            #controls-panel input[type="range"]::-webkit-slider-thumb { width: 26px; height: 26px; }
+            #controls-panel input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; }
+            .halogen-btn { min-height: 38px; padding: 8px 16px; font-size: 14px; }
+            #angle-value { font-size: 14px; padding: 5px 12px; }
+        }
+
+        @media (max-width: 700px) {
+            #controls-panel {
+                width: calc(100vw - 24px);
+                padding: 10px 12px;
+                gap: 8px 10px;
+                border-radius: 20px;
+            }
+            #controls-panel label {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 8px;
+                font-size: 13px;
+            }
+            #controls-panel input[type="range"] { width: 100%; max-width: 320px; }
+            #angle-value { min-width: 62px; }
+            .halogen-picker {
+                width: 100%;
+                justify-content: center;
+                padding-left: 0;
+                padding-top: 8px;
+                border-left: none;
+                border-top: 1px solid #eee;
+                gap: 8px;
+            }
+            .halogen-btn { min-height: 36px; padding: 7px 14px; font-size: 13px; }
+            #click-hint { font-size: 11px; padding: 4px 12px; top: 12px; right: 12px; }
+        }
+
+        @media (max-width: 380px) {
+            #controls-panel { padding: 8px 10px; gap: 6px; }
+            .halogen-btn { min-height: 32px; padding: 6px 12px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="click-hint">👆 点击 H → 按选择变 Cl / Br · 再点卤素 → 变回 H</div>
+
+    <div id="controls-panel">
+        <label>
+            <span style="color:#555;">↻ 旋转右侧甲基</span>
+            <input type="range" id="rotate-slider" min="0" max="360" step="0.1" value="60">
+        </label>
+        <span id="angle-value">60.0°</span>
+
+        <div class="halogen-picker">
+            <span class="picker-label">点击 H 替换：</span>
+            <button class="halogen-btn active" data-halogen="Cl">Cl 氯</button>
+            <button class="halogen-btn" data-halogen="Br">Br 溴</button>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+        scene.fog = null;
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const bondCenter = new THREE.Vector3(0, 0, 0.85);
+        camera.position.set(5, 3, 8);
+        camera.lookAt(bondCenter);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(bondCenter);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.autoRotate = false;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0x888888));
+
+        const light1 = new THREE.PointLight(0xffffff, 1.4);
+        light1.position.set(6, 8, 6);
+        scene.add(light1);
+
+        const light2 = new THREE.PointLight(0xffffff, 1.2);
+        light2.position.set(-5, 4, 7);
+        scene.add(light2);
+
+        const light3 = new THREE.DirectionalLight(0xffffff, 0.8);
+        light3.position.set(-3, 2, -5);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 1.0);
+        light4.position.set(4, -3, 6);
+        scene.add(light4);
+
+        const light5 = new THREE.PointLight(0xffffff, 0.9);
+        light5.position.set(0, 5, -5);
+        scene.add(light5);
+
+        // ============================================================
+        // 原子半径
+        //   ★ 碳、氢保持原值不变：C = 0.50, H = 0.30
+        //   ★ 新增 Cl、Br 按真实共价半径比（以 C=0.50 为基准）：
+        //       共价半径 pm：H 31, C 76, Cl 102, Br 120
+        //       Cl = 0.50 × 102/76 ≈ 0.67
+        //       Br = 0.50 × 120/76 ≈ 0.79
+        //   ★ 严格满足 H < C < Cl < Br，Cl/Br 都明显大于 C
+        // ============================================================
+        const RADII = { H: 0.30, C: 0.50, Cl: 0.67, Br: 0.79 };
+
+        const carbonMat = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            roughness: 0.2,
+            metalness: 0.05
+        });
+
+        const atomMaterials = {
+            H:  new THREE.MeshStandardMaterial({ color: 0x3366cc, roughness: 0.2, metalness: 0.0 }),
+            Cl: new THREE.MeshStandardMaterial({ color: 0x44dd88, roughness: 0.2, metalness: 0.0 }),
+            Br: new THREE.MeshStandardMaterial({ color: 0x9a3a1d, roughness: 0.2, metalness: 0.0 })
+        };
+
+        const bondMat = new THREE.MeshStandardMaterial({
+            color: 0x888888,
+            roughness: 0.3,
+            metalness: 0.0,
+            transparent: false
+        });
+
+        // --- 乙烷骨架 ---
+        const bondLength = 1.7;
+        const c1Pos = new THREE.Vector3(0, 0, 0);
+        const c2Pos = new THREE.Vector3(0, 0, 1.7);
+
+        const carbon1 = new THREE.Mesh(new THREE.SphereGeometry(RADII.C, 64, 32), carbonMat);
+        carbon1.position.copy(c1Pos);
+        scene.add(carbon1);
+
+        const carbon2 = new THREE.Mesh(new THREE.SphereGeometry(RADII.C, 64, 32), carbonMat);
+        carbon2.position.copy(c2Pos);
+        scene.add(carbon2);
+
+        const ccBondGeo = new THREE.CylinderGeometry(0.1, 0.1, bondLength, 12);
+        const ccBond = new THREE.Mesh(ccBondGeo, bondMat);
+        ccBond.position.set(0, 0, 0.85);
+        ccBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+        scene.add(ccBond);
+
+        // ============================================================
+        // 可替换原子管理
+        // ============================================================
+        const clickableAtoms = [];
+        const replaceableAtoms = [];
+
+        const rightGroup = new THREE.Group();
+        rightGroup.position.copy(c2Pos);
+        scene.add(rightGroup);
+
+        function createCXBond(relPos) {
+            const dir = relPos.clone().normalize();
+            const len = relPos.length();
+            const geo = new THREE.CylinderGeometry(0.08, 0.08, len, 12);
+            const cylinder = new THREE.Mesh(geo, bondMat);
+            cylinder.position.copy(relPos.clone().multiplyScalar(0.5));
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            return cylinder;
+        }
+
+        function createAtomRecord(type, side, relPos, cPos) {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(RADII[type], 48, 24),
+                atomMaterials[type]
+            );
+            mesh.position.copy(relPos);
+
+            const bond = createCXBond(relPos);
+
+            if (side === 'right') {
+                rightGroup.add(mesh);
+                rightGroup.add(bond);
+            } else {
+                scene.add(mesh);
+                scene.add(bond);
+            }
+            clickableAtoms.push(mesh);
+
+            const record = {
+                mesh,
+                bond,
+                side,
+                relPos: relPos.clone(),
+                cPos: cPos.clone(),
+                type
+            };
+            replaceableAtoms.push(record);
+            return record;
+        }
+
+        function swapAtom(record, newType) {
+            if (record.side === 'right') {
+                rightGroup.remove(record.mesh);
+                rightGroup.remove(record.bond);
+            } else {
+                scene.remove(record.mesh);
+                scene.remove(record.bond);
+            }
+            record.mesh.geometry.dispose();
+            record.bond.geometry.dispose();
+
+            const ci = clickableAtoms.indexOf(record.mesh);
+            if (ci > -1) clickableAtoms.splice(ci, 1);
+
+            const newMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(RADII[newType], 48, 24),
+                atomMaterials[newType]
+            );
+            newMesh.position.copy(record.relPos);
+
+            const newBond = createCXBond(record.relPos);
+
+            if (record.side === 'right') {
+                rightGroup.add(newMesh);
+                rightGroup.add(newBond);
+            } else {
+                scene.add(newMesh);
+                scene.add(newBond);
+            }
+            clickableAtoms.push(newMesh);
+
+            record.mesh = newMesh;
+            record.bond = newBond;
+            record.type = newType;
+        }
+
+        // --- 左侧 CH₃ ---
+        const chLength = 1.5;
+        const cosTet = -1 / 3;
+        const sinTet = Math.sqrt(1 - cosTet * cosTet);
+        const anglesLeft = [0, 120, 240].map(deg => deg * Math.PI / 180);
+
+        anglesLeft.forEach(phi => {
+            const x = sinTet * Math.cos(phi) * chLength;
+            const y = sinTet * Math.sin(phi) * chLength;
+            const z = cosTet * chLength;
+            const relPos = new THREE.Vector3(x, y, z);
+            createAtomRecord('H', 'left', relPos, c1Pos);
+        });
+
+        // --- 右侧 CH₃ ---
+        const cosRight = 1 / 3;
+        const sinRight = Math.sqrt(1 - cosRight * cosRight);
+        const anglesRight = [0, 120, 240].map(deg => deg * Math.PI / 180);
+
+        anglesRight.forEach(phi => {
+            const x = sinRight * Math.cos(phi) * chLength;
+            const y = sinRight * Math.sin(phi) * chLength;
+            const z = cosRight * chLength;
+            const relPos = new THREE.Vector3(x, y, z);
+            createAtomRecord('H', 'right', relPos, c2Pos);
+        });
+
+        const initialDeg = 60;
+        rightGroup.rotation.z = initialDeg * Math.PI / 180;
+
+        // --- 滑块 ---
+        const slider = document.getElementById('rotate-slider');
+        const angleDisplay = document.getElementById('angle-value');
+        slider.value = initialDeg;
+        angleDisplay.textContent = initialDeg.toFixed(1) + '°';
+
+        function applyRotation(deg) {
+            angleDisplay.textContent = deg.toFixed(1) + '°';
+            rightGroup.rotation.z = deg * Math.PI / 180;
+        }
+        slider.addEventListener('input', (e) => applyRotation(parseFloat(e.target.value)));
+        slider.addEventListener('change', (e) => applyRotation(parseFloat(e.target.value)));
+
+        // --- 卤素选择器 ---
+        let selectedHalogen = 'Cl';
+        const halogenBtns = document.querySelectorAll('.halogen-btn');
+        halogenBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedHalogen = btn.dataset.halogen;
+                halogenBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        // --- 拾取 ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function doPick(clientX, clientY, pointerType) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableAtoms, false);
+
+            let hitMesh = null;
+            if (intersects.length > 0) {
+                hitMesh = intersects[0].object;
+            } else if (pointerType !== 'mouse') {
+                const v = new THREE.Vector3();
+                let best = null, bestDist = 45;
+                clickableAtoms.forEach(atom => {
+                    atom.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = atom; }
+                });
+                if (best) hitMesh = best;
+            }
+
+            if (!hitMesh) return;
+
+            const record = replaceableAtoms.find(r => r.mesh === hitMesh);
+            if (!record) return;
+
+            if (record.type === 'H') {
+                swapAtom(record, selectedHalogen);
+            } else {
+                swapAtom(record, 'H');
+            }
+        }
+
+        // --- 触屏 / 鼠标 点击识别 ---
+        const activePointers = new Set();
+        let pointerDownInfo = null;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                pointerDownInfo = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch',
+                    id: e.pointerId
+                };
+            } else {
+                pointerDownInfo = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!pointerDownInfo || pointerDownInfo.id !== e.pointerId || activePointers.size !== 1) return;
+            const dx = e.clientX - pointerDownInfo.x;
+            const dy = e.clientY - pointerDownInfo.y;
+            const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+            if (dx * dx + dy * dy > thr * thr) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const countBeforeUp = activePointers.size;
+            if (pointerDownInfo && pointerDownInfo.id === e.pointerId && countBeforeUp === 1) {
+                const dx = e.clientX - pointerDownInfo.x;
+                const dy = e.clientY - pointerDownInfo.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = performance.now() - pointerDownInfo.t;
+                const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+                if (dist <= thr && dt <= 500) {
+                    doPick(e.clientX, e.clientY, pointerDownInfo.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            pointerDownInfo = null;
+        });
+
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        const controlPanel = document.getElementById('controls-panel');
+        controlPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+        controlPanel.addEventListener('pointermove', (e) => e.stopPropagation());
+
+        // --- 相机自适应 ---
+        //   content 尺寸按最大原子 Br 估算
+        function updateCameraZoom() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const dist = camera.position.distanceTo(controls.target);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+            const baseVisibleH = 2 * dist * Math.tan(fovRad);
+            const baseVisibleW = baseVisibleH * aspect;
+
+            const contentW = 7.5;
+            const contentH = 5.0;
+
+            const zoomForW = baseVisibleW / contentW;
+            const zoomForH = baseVisibleH / contentH;
+
+            const isLandscape = aspect > 1;
+            const maxZoom = isLandscape ? 1.0 : 0.95;
+            const minZoom = isLandscape ? 0.55 : 0.32;
+
+            camera.zoom = Math.max(minZoom, Math.min(maxZoom, zoomForW, zoomForH));
+            camera.updateProjectionMatrix();
+        }
+        updateCameraZoom();
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 窗口 / 屏幕变化 ---
+        let resizeTimer = null;
+        function onWindowResize() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                updateCameraZoom();
+            }, 60);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onWindowResize, 300);
+        });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onWindowResize);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

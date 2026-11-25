@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>3D 元素周期表 - 深蓝预选高亮</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #f4f6f8;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            position: fixed; width: 100%; height: 100%;
+            -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        canvas { display: block; touch-action: none; }
+
+        .label-3d { color: #111; font-weight: bold; text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; pointer-events: none; user-select: none; text-align: center; }
+        .label-3d .element { font-size: 14px; }
+        .label-3d .value { font-size: 11px; font-weight: normal; }
+
+        #legend {
+            position: absolute;
+            top: max(20px, env(safe-area-inset-top));
+            left: max(20px, env(safe-area-inset-left));
+            background: rgba(255,255,255,0.9);
+            padding: 8px 12px; border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100; pointer-events: none;
+            font-size: 11px; color: #333;
+        }
+        #legend .row { display: flex; align-items: center; margin: 3px 0; }
+        #legend .box { width: 14px; height: 10px; margin-right: 6px; border-radius: 2px; }
+
+        #toolbar {
+            position: absolute;
+            bottom: max(16px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 14px;
+            border-radius: 12px;
+            z-index: 200;
+            color: #fff;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            max-width: calc(100vw - 24px);
+            box-sizing: border-box;
+        }
+
+        .btn {
+            background: #F4511E; color: #fff; border: none;
+            padding: 10px 14px; border-radius: 6px;
+            cursor: pointer; font-size: 13px; font-weight: bold;
+            min-height: 40px; min-width: 60px;
+            transition: background 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:hover { background: #D84315; }
+        .btn:active { background: #BF360C; }
+        .btn-reset { background: #555; }
+        .btn-reset:hover { background: #444; }
+        .btn-reset:active { background: #333; }
+
+        .toolbar-divider { width: 1px; height: 22px; background: rgba(255,255,255,0.22); margin: 0 2px; }
+        .filter-label { color: rgba(255,255,255,0.65); font-size: 13px; white-space: nowrap; }
+        .tool-select {
+            background: #333; color: #fff;
+            border: 1px solid #555; border-radius: 6px;
+            padding: 8px 8px; font-size: 13px; min-height: 36px;
+            cursor: pointer; outline: none;
+            transition: border-color 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tool-select:hover { border-color: #888; }
+        .tool-select:focus { border-color: #F4511E; }
+
+        .toggle-switch { position: relative; display: inline-block; width: 42px; height: 22px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider-round { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 30px; }
+        .slider-round:before { position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider-round { background-color: #F4511E; }
+        input:checked + .slider-round:before { transform: translateX(20px); }
+
+        #selectedInfo {
+            position: absolute;
+            top: max(20px, env(safe-area-inset-top));
+            right: max(20px, env(safe-area-inset-right));
+            background: rgba(255,255,255,0.95);
+            padding: 12px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100; font-size: 12px; color: #333;
+            display: none; max-width: 200px; word-wrap: break-word;
+        }
+
+        #confirmNotice {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85); color: white;
+            padding: 15px 30px; border-radius: 8px;
+            font-size: 16px; font-weight: bold;
+            z-index: 300; display: none; text-align: center;
+            pointer-events: none;
+            max-width: calc(100vw - 40px);
+            box-sizing: border-box;
+        }
+
+        /* 竖屏 / 小屏适配 */
+        @media (max-width: 600px) {
+            #toolbar { padding: 8px 10px; gap: 6px 8px; font-size: 12px; bottom: max(10px, env(safe-area-inset-bottom)); }
+            .btn { padding: 8px 10px; font-size: 12px; min-height: 36px; min-width: 50px; }
+            .tool-select { padding: 6px 5px; font-size: 12px; min-height: 32px; }
+            .filter-label { font-size: 12px; }
+            .toolbar-divider { display: none; }
+            .toggle-switch { width: 38px; height: 20px; }
+            .slider-round:before { height: 16px; width: 16px; }
+            input:checked + .slider-round:before { transform: translateX(18px); }
+            #legend { top: 10px; left: 10px; padding: 6px 8px; font-size: 10px; }
+            #selectedInfo { top: 10px; right: 10px; padding: 8px; max-width: 140px; font-size: 11px; }
+            #confirmNotice { font-size: 14px; padding: 12px 20px; }
+        }
+    </style>
+
+    </head>
+<body>
+    <div id="legend">
+        <div class="row"><div class="box" style="background: #F4511E;"></div> 金属</div>
+        <div class="row"><div class="box" style="background: #00ACC1;"></div> 非金属</div>
+        <div class="row" style="margin-top:5px; font-weight:bold;">💡 点击预选，确认后隐身</div>
+    </div>
+
+    <div id="selectedInfo">
+        <div style="font-weight:bold; margin-bottom:5px;">已预选:</div>
+        <div id="selectedList" style="line-height:1.5;"></div>
+    </div>
+
+    <div id="confirmNotice">已筛选，点击"重置"恢复</div>
+
+    <div id="toolbar">
+        <span id="switchLabel">原子</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="radiusToggle">
+            <span class="slider-round"></span>
+        </label>
+        <span id="switchLabelRight">离子</span>
+
+        <div class="toolbar-divider"></div>
+
+        <span class="filter-label">周期</span>
+        <select id="periodSelect" class="tool-select">
+            <option value="0">全部</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+        </select>
+
+        <span class="filter-label">族</span>
+        <select id="groupSelect" class="tool-select">
+            <option value="0">全部</option>
+            <option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option><option value="6">6</option>
+            <option value="7">7</option><option value="8">8</option>
+            <option value="9">9</option><option value="10">10</option>
+            <option value="11">11</option><option value="12">12</option>
+            <option value="13">13</option><option value="14">14</option>
+            <option value="15">15</option><option value="16">16</option>
+            <option value="17">17</option><option value="18">18</option>
+            <option value="100">镧系</option>
+            <option value="101">锕系</option>
+        </select>
+
+        <div class="toolbar-divider"></div>
+
+        <button class="btn" id="confirmBtn">确认筛选 (0)</button>
+        <button class="btn btn-reset" id="resetAllBtn">重置全部</button>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        const elementsData = [
+            { r: 1, g: 1, s: 'H', atom: 0.053, ionCharge: 'H+', ion: 0.037, type: 'nonmetal' },
+            { r: 2, g: 1, s: 'Li', atom: 0.152, ionCharge: 'Li+', ion: 0.076, type: 'metal' },
+            { r: 2, g: 2, s: 'Be', atom: 0.112, ionCharge: 'Be2+', ion: 0.045, type: 'metal' },
+            { r: 2, g: 13, s: 'B', atom: 0.083, ionCharge: 'B3+', ion: 0.027, type: 'nonmetal' },
+            { r: 2, g: 14, s: 'C', atom: 0.077, ionCharge: 'C4+', ion: 0.015, type: 'nonmetal' },
+            { r: 2, g: 15, s: 'N', atom: 0.070, ionCharge: 'N3-', ion: 0.146, type: 'nonmetal' },
+            { r: 2, g: 16, s: 'O', atom: 0.066, ionCharge: 'O2-', ion: 0.140, type: 'nonmetal' },
+            { r: 2, g: 17, s: 'F', atom: 0.072, ionCharge: 'F-', ion: 0.133, type: 'nonmetal' },
+            { r: 3, g: 1, s: 'Na', atom: 0.186, ionCharge: 'Na+', ion: 0.102, type: 'metal' },
+            { r: 3, g: 2, s: 'Mg', atom: 0.160, ionCharge: 'Mg2+', ion: 0.072, type: 'metal' },
+            { r: 3, g: 13, s: 'Al', atom: 0.143, ionCharge: 'Al3+', ion: 0.053, type: 'metal' },
+            { r: 3, g: 14, s: 'Si', atom: 0.117, ionCharge: 'Si4+', ion: 0.040, type: 'nonmetal' },
+            { r: 3, g: 15, s: 'P', atom: 0.110, ionCharge: 'P3-', ion: 0.212, type: 'nonmetal' },
+            { r: 3, g: 16, s: 'S', atom: 0.104, ionCharge: 'S2-', ion: 0.184, type: 'nonmetal' },
+            { r: 3, g: 17, s: 'Cl', atom: 0.099, ionCharge: 'Cl-', ion: 0.181, type: 'nonmetal' },
+            { r: 4, g: 1, s: 'K', atom: 0.227, ionCharge: 'K+', ion: 0.138, type: 'metal' },
+            { r: 4, g: 2, s: 'Ca', atom: 0.197, ionCharge: 'Ca2+', ion: 0.100, type: 'metal' },
+            { r: 4, g: 3, s: 'Sc', atom: 0.161, ionCharge: 'Sc3+', ion: 0.074, type: 'metal' },
+            { r: 4, g: 4, s: 'Ti', atom: 0.145, ionCharge: 'Ti4+', ion: 0.060, type: 'metal' },
+            { r: 4, g: 5, s: 'V', atom: 0.132, ionCharge: 'V3+', ion: 0.064, type: 'metal' },
+            { r: 4, g: 6, s: 'Cr', atom: 0.125, ionCharge: 'Cr3+', ion: 0.061, type: 'metal' },
+            { r: 4, g: 7, s: 'Mn', atom: 0.124, ionCharge: 'Mn2+', ion: 0.083, type: 'metal' },
+            { r: 4, g: 8, s: 'Fe', atom: 0.124, ionCharge: 'Fe3+', ion: 0.064, type: 'metal' },
+            { r: 4, g: 9, s: 'Co', atom: 0.125, ionCharge: 'Co2+', ion: 0.074, type: 'metal' },
+            { r: 4, g: 10, s: 'Ni', atom: 0.125, ionCharge: 'Ni2+', ion: 0.069, type: 'metal' },
+            { r: 4, g: 11, s: 'Cu', atom: 0.128, ionCharge: 'Cu2+', ion: 0.073, type: 'metal' },
+            { r: 4, g: 12, s: 'Zn', atom: 0.133, ionCharge: 'Zn2+', ion: 0.074, type: 'metal' },
+            { r: 4, g: 13, s: 'Ga', atom: 0.122, ionCharge: 'Ga3+', ion: 0.062, type: 'metal' },
+            { r: 4, g: 14, s: 'Ge', atom: 0.122, ionCharge: 'Ge4+', ion: 0.053, type: 'nonmetal' },
+            { r: 4, g: 15, s: 'As', atom: 0.120, ionCharge: 'As3-', ion: 0.222, type: 'nonmetal' },
+            { r: 4, g: 16, s: 'Se', atom: 0.115, ionCharge: 'Se2-', ion: 0.198, type: 'nonmetal' },
+            { r: 4, g: 17, s: 'Br', atom: 0.115, ionCharge: 'Br-', ion: 0.196, type: 'nonmetal' },
+            { r: 5, g: 1, s: 'Rb', atom: 0.248, ionCharge: 'Rb+', ion: 0.152, type: 'metal' },
+            { r: 5, g: 2, s: 'Sr', atom: 0.215, ionCharge: 'Sr2+', ion: 0.118, type: 'metal' },
+            { r: 5, g: 3, s: 'Y', atom: 0.180, ionCharge: 'Y3+', ion: 0.090, type: 'metal' },
+            { r: 5, g: 4, s: 'Zr', atom: 0.160, ionCharge: 'Zr4+', ion: 0.072, type: 'metal' },
+            { r: 5, g: 5, s: 'Nb', atom: 0.143, ionCharge: 'Nb3+', ion: 0.072, type: 'metal' },
+            { r: 5, g: 6, s: 'Mo', atom: 0.138, ionCharge: 'Mo6+', ion: 0.060, type: 'metal' },
+            { r: 5, g: 7, s: 'Tc', atom: 0.135, ionCharge: 'Tc4+', ion: 0.065, type: 'metal' },
+            { r: 5, g: 8, s: 'Ru', atom: 0.134, ionCharge: 'Ru3+', ion: 0.068, type: 'metal' },
+            { r: 5, g: 9, s: 'Rh', atom: 0.134, ionCharge: 'Rh3+', ion: 0.066, type: 'metal' },
+            { r: 5, g: 10, s: 'Pd', atom: 0.138, ionCharge: 'Pd2+', ion: 0.086, type: 'metal' },
+            { r: 5, g: 11, s: 'Ag', atom: 0.144, ionCharge: 'Ag+', ion: 0.115, type: 'metal' },
+            { r: 5, g: 12, s: 'Cd', atom: 0.149, ionCharge: 'Cd2+', ion: 0.095, type: 'metal' },
+            { r: 5, g: 13, s: 'In', atom: 0.163, ionCharge: 'In3+', ion: 0.080, type: 'metal' },
+            { r: 5, g: 14, s: 'Sn', atom: 0.140, ionCharge: 'Sn4+', ion: 0.069, type: 'metal' },
+            { r: 5, g: 15, s: 'Sb', atom: 0.140, ionCharge: 'Sb3+', ion: 0.076, type: 'nonmetal' },
+            { r: 5, g: 16, s: 'Te', atom: 0.135, ionCharge: 'Te2-', ion: 0.221, type: 'nonmetal' },
+            { r: 5, g: 17, s: 'I', atom: 0.138, ionCharge: 'I-', ion: 0.220, type: 'nonmetal' },
+            { r: 6, g: 1, s: 'Cs', atom: 0.265, ionCharge: 'Cs+', ion: 0.167, type: 'metal' },
+            { r: 6, g: 2, s: 'Ba', atom: 0.217, ionCharge: 'Ba2+', ion: 0.135, type: 'metal' },
+            { r: 6, g: 3, s: 'La', atom: 0.187, ionCharge: 'La3+', ion: 0.103, type: 'metal' },
+            { r: 6, g: 4, s: 'Hf', atom: 0.155, ionCharge: 'Hf4+', ion: 0.071, type: 'metal' },
+            { r: 6, g: 5, s: 'Ta', atom: 0.143, ionCharge: 'Ta5+', ion: 0.064, type: 'metal' },
+            { r: 6, g: 6, s: 'W', atom: 0.137, ionCharge: 'W6+', ion: 0.060, type: 'metal' },
+            { r: 6, g: 7, s: 'Re', atom: 0.138, ionCharge: 'Re4+', ion: 0.063, type: 'metal' },
+            { r: 6, g: 8, s: 'Os', atom: 0.134, ionCharge: 'Os4+', ion: 0.063, type: 'metal' },
+            { r: 6, g: 9, s: 'Ir', atom: 0.136, ionCharge: 'Ir4+', ion: 0.062, type: 'metal' },
+            { r: 6, g: 10, s: 'Pt', atom: 0.139, ionCharge: 'Pt2+', ion: 0.080, type: 'metal' },
+            { r: 6, g: 11, s: 'Au', atom: 0.144, ionCharge: 'Au3+', ion: 0.085, type: 'metal' },
+            { r: 6, g: 12, s: 'Hg', atom: 0.160, ionCharge: 'Hg2+', ion: 0.102, type: 'metal' },
+            { r: 6, g: 13, s: 'Tl', atom: 0.170, ionCharge: 'Tl3+', ion: 0.088, type: 'metal' },
+            { r: 6, g: 14, s: 'Pb', atom: 0.175, ionCharge: 'Pb2+', ion: 0.119, type: 'metal' },
+            { r: 6, g: 15, s: 'Bi', atom: 0.155, ionCharge: 'Bi3+', ion: 0.103, type: 'nonmetal' },
+            { r: 6, g: 16, s: 'Po', atom: 0.135, ionCharge: 'Po2-', ion: 0.230, type: 'nonmetal' },
+            { r: 6, g: 17, s: 'At', atom: 0.140, ionCharge: 'At-', ion: 0.227, type: 'nonmetal' },
+            { r: 7, g: 1, s: 'Fr', atom: 0.270, ionCharge: 'Fr+', ion: 0.180, type: 'metal' },
+            { r: 7, g: 2, s: 'Ra', atom: 0.220, ionCharge: 'Ra2+', ion: 0.148, type: 'metal' },
+            { r: 7, g: 3, s: 'Ac', atom: 0.188, ionCharge: 'Ac3+', ion: 0.112, type: 'metal' },
+            { r: 8, g: 1, s: 'Ce', atom: 0.182, ionCharge: 'Ce3+', ion: 0.101, type: 'metal' },
+            { r: 8, g: 2, s: 'Pr', atom: 0.182, ionCharge: 'Pr3+', ion: 0.099, type: 'metal' },
+            { r: 8, g: 3, s: 'Nd', atom: 0.181, ionCharge: 'Nd3+', ion: 0.098, type: 'metal' },
+            { r: 8, g: 4, s: 'Pm', atom: 0.181, ionCharge: 'Pm3+', ion: 0.097, type: 'metal' },
+            { r: 8, g: 5, s: 'Sm', atom: 0.180, ionCharge: 'Sm3+', ion: 0.096, type: 'metal' },
+            { r: 8, g: 6, s: 'Eu', atom: 0.204, ionCharge: 'Eu3+', ion: 0.095, type: 'metal' },
+            { r: 8, g: 7, s: 'Gd', atom: 0.180, ionCharge: 'Gd3+', ion: 0.094, type: 'metal' },
+            { r: 8, g: 8, s: 'Tb', atom: 0.178, ionCharge: 'Tb3+', ion: 0.092, type: 'metal' },
+            { r: 8, g: 9, s: 'Dy', atom: 0.177, ionCharge: 'Dy3+', ion: 0.091, type: 'metal' },
+            { r: 8, g: 10, s: 'Ho', atom: 0.176, ionCharge: 'Ho3+', ion: 0.090, type: 'metal' },
+            { r: 8, g: 11, s: 'Er', atom: 0.175, ionCharge: 'Er3+', ion: 0.089, type: 'metal' },
+            { r: 8, g: 12, s: 'Tm', atom: 0.174, ionCharge: 'Tm3+', ion: 0.088, type: 'metal' },
+            { r: 8, g: 13, s: 'Yb', atom: 0.194, ionCharge: 'Yb3+', ion: 0.086, type: 'metal' },
+            { r: 8, g: 14, s: 'Lu', atom: 0.173, ionCharge: 'Lu3+', ion: 0.086, type: 'metal' },
+            { r: 9, g: 1, s: 'Th', atom: 0.180, ionCharge: 'Th4+', ion: 0.094, type: 'metal' },
+            { r: 9, g: 2, s: 'Pa', atom: 0.161, ionCharge: 'Pa4+', ion: 0.090, type: 'metal' },
+            { r: 9, g: 3, s: 'U', atom: 0.158, ionCharge: 'U4+', ion: 0.089, type: 'metal' },
+            { r: 9, g: 4, s: 'Np', atom: 0.155, ionCharge: 'Np4+', ion: 0.087, type: 'metal' },
+            { r: 9, g: 5, s: 'Pu', atom: 0.159, ionCharge: 'Pu4+', ion: 0.086, type: 'metal' },
+            { r: 9, g: 6, s: 'Am', atom: 0.173, ionCharge: 'Am3+', ion: 0.098, type: 'metal' },
+            { r: 9, g: 7, s: 'Cm', atom: 0.174, ionCharge: 'Cm3+', ion: 0.097, type: 'metal' },
+            { r: 9, g: 8, s: 'Bk', atom: 0.170, ionCharge: 'Bk4+', ion: 0.083, type: 'metal' },
+            { r: 9, g: 9, s: 'Cf', atom: 0.186, ionCharge: 'Cf3+', ion: 0.095, type: 'metal' },
+            { r: 9, g: 10, s: 'Es', atom: 0.186, ionCharge: 'Es3+', ion: 0.092, type: 'metal' },
+            { r: 9, g: 11, s: 'Fm', atom: 0.186, ionCharge: 'Fm3+', ion: 0.091, type: 'metal' }
+        ];
+
+        function getColor(el, isIon) {
+            if (!isIon) {
+                return el.type === 'metal' ? 0xF4511E : 0x00ACC1;
+            } else {
+                return el.ionCharge.includes('+') ? 0x8E24AA : 0x006064;
+            }
+        }
+
+        // =========================================================
+        // 场景 / 相机 / 渲染器
+        // =========================================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf4f6f8);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(-20, 40, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const preSelectedMap = new Map();
+        let isConfirmed = false;
+        let isIonMode = false;
+
+        const floorMat = new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
+        const floorGeo = new THREE.PlaneGeometry(40, 45);
+        const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+        floorMesh.position.set(0, -0.05, -5);
+        floorMesh.rotation.x = -Math.PI / 2;
+        floorMesh.receiveShadow = true;
+        scene.add(floorMesh);
+
+        const scaleHeight = 40;
+        const spacing = 2.0;
+        const totalCols = 17;
+        const offsetX = -(totalCols * spacing / 2);
+
+        const allBars = [];
+        const allLabels = [];
+
+        elementsData.forEach(el => {
+            let finalPosX, posZ;
+            if (el.r <= 7) {
+                finalPosX = (18 - el.g) * spacing + offsetX;
+                posZ = (el.r - 4) * -spacing;
+            } else if (el.r === 8) {
+                finalPosX = (17 - el.g) * spacing + offsetX;
+                posZ = -12;
+            } else {
+                finalPosX = (17 - el.g) * spacing + offsetX;
+                posZ = -16;
+            }
+
+            const initHeight = el.atom * scaleHeight;
+            const initColor = getColor(el, false);
+
+            const geometry = new THREE.BoxGeometry(1.6, initHeight, 1.6);
+            const material = new THREE.MeshStandardMaterial({ color: initColor, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 1.0 });
+            const bar = new THREE.Mesh(geometry, material);
+            bar.castShadow = true;
+            bar.receiveShadow = true;
+            bar.position.set(finalPosX, initHeight / 2, posZ);
+            bar.userData = { el, scaleHeight, x: finalPosX, z: posZ };
+            scene.add(bar);
+            allBars.push(bar);
+
+            const div = document.createElement('div');
+            div.className = 'label-3d';
+            div.innerHTML = `<div class="element">${el.s}</div><div class="value">${el.atom.toFixed(3)}</div>`;
+            const label = new CSS2DObject(div);
+            label.position.set(finalPosX, initHeight + 0.3, posZ);
+            label.userData = { el, scaleHeight, x: finalPosX, z: posZ };
+            scene.add(label);
+            allLabels.push(label);
+        });
+
+        // =========================================================
+        // ★★★ 横竖屏自动切换（核心改动）★★★
+        //
+        // 横屏 LANDSCAPE_CONFIG：沿用原来的斜俯视角，立体感强。
+        // 竖屏 PORTRAIT_CONFIG ：周期表是「17列 × 9行」的宽扁结构，
+        //   竖屏横向放不下，所以自动切到更高更远的俯视角
+        //   (0, 42, -45)，让 34 单位宽度完整落进窄屏，透视更平，
+        //   点击也更容易命中。
+        // 相机位置/目标/fov/zoom 一起做 400ms 平滑缓动。
+        // =========================================================
+        const LANDSCAPE_CONFIG = {
+            pos: new THREE.Vector3(0, 28, -30),
+            target: new THREE.Vector3(0, 3, -2),
+            fov: 45,
+            maxZoom: 0.75
+        };
+        const PORTRAIT_CONFIG = {
+            pos: new THREE.Vector3(0, 42, -45),
+            target: new THREE.Vector3(0, 3, -5),
+            fov: 45,
+            maxZoom: 0.70
+        };
+
+        // 根据配置和当前宽高比，计算一个能完整容纳周期表的 zoom
+        function computeZoom(cfg, aspect) {
+            const dist = cfg.pos.distanceTo(cfg.target);
+            const baseH = 2 * dist * Math.tan(THREE.MathUtils.degToRad(cfg.fov / 2));
+            const contentW = 36;   // 周期表 34 宽 + 边距
+            const contentH = 34;   // 9 行纵深 + 最高柱 + 边距
+            const zoomW = baseH * aspect / contentW;
+            const zoomH = baseH / contentH;
+            return Math.max(0.30, Math.min(cfg.maxZoom, zoomW, zoomH));
+        }
+
+        // 相机缓动状态
+        let camTween = null;
+
+        function setCameraTween(toPos, toTarget, toFov, toZoom, duration = 400) {
+            camTween = {
+                fromPos: camera.position.clone(),
+                toPos: toPos.clone(),
+                fromTarget: controls.target.clone(),
+                toTarget: toTarget.clone(),
+                fromFov: camera.fov,
+                toFov: toFov,
+                fromZoom: camera.zoom,
+                toZoom: toZoom,
+                start: performance.now(),
+                duration: duration
+            };
+        }
+
+        // 判断当前横竖屏并应用对应取景
+        // smooth=true 时用缓动过渡；首次初始化时用 false 直接落位
+        let currentOrientation = null;
+
+        function applyOrientationCamera(smooth = true) {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const aspect = window.innerWidth / window.innerHeight;
+            const orientationKey = isLandscape ? 'landscape' : 'portrait';
+            const cfg = isLandscape ? LANDSCAPE_CONFIG : PORTRAIT_CONFIG;
+            const zoom = computeZoom(cfg, aspect);
+
+            camera.aspect = aspect;
+
+            // 如果朝向没变（只是窗口缩放），只更新 aspect / zoom，不搬相机
+            if (currentOrientation === orientationKey) {
+                camera.zoom = zoom;
+                camera.updateProjectionMatrix();
+                controls.update();
+                return;
+            }
+
+            currentOrientation = orientationKey;
+
+            if (smooth && camera.position.lengthSq() > 0) {
+                setCameraTween(cfg.pos, cfg.target, cfg.fov, zoom, 400);
+            } else {
+                camera.position.copy(cfg.pos);
+                controls.target.copy(cfg.target);
+                camera.fov = cfg.fov;
+                camera.zoom = zoom;
+                camera.updateProjectionMatrix();
+                controls.update();
+            }
+        }
+
+        // =========================================================
+        // 预选 / 高亮 / 拾取
+        // =========================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const confirmBtn = document.getElementById('confirmBtn');
+        const resetAllBtn = document.getElementById('resetAllBtn');
+        const confirmNotice = document.getElementById('confirmNotice');
+        const selectedInfoBox = document.getElementById('selectedInfo');
+        const selectedListEl = document.getElementById('selectedList');
+        const periodSelect = document.getElementById('periodSelect');
+        const groupSelect = document.getElementById('groupSelect');
+
+        let periodFilter = 0;
+        let groupFilter = 0;
+
+        function getElementPeriod(el) {
+            if (el.r === 8) return 6;
+            if (el.r === 9) return 7;
+            return el.r;
+        }
+        function getElementGroup(el) {
+            if (el.r === 8) return 100;
+            if (el.r === 9) return 101;
+            return el.g;
+        }
+        function matchPeriod(el) { return periodFilter === 0 || getElementPeriod(el) === periodFilter; }
+        function matchGroup(el)  { return groupFilter  === 0 || getElementGroup(el)  === groupFilter;  }
+
+        function applyVisibility() {
+            allBars.forEach((bar, i) => {
+                const el = bar.userData.el;
+                let visible = matchPeriod(el) && matchGroup(el);
+                if (isConfirmed && !preSelectedMap.has(el.s)) visible = false;
+                bar.visible = visible;
+                if (allLabels[i]) allLabels[i].visible = visible;
+            });
+        }
+
+        function onFilterChange() {
+            periodFilter = parseInt(periodSelect.value, 10) || 0;
+            groupFilter  = parseInt(groupSelect.value, 10) || 0;
+
+            if (!isConfirmed && preSelectedMap.size > 0) {
+                let changed = false;
+                Array.from(preSelectedMap.keys()).forEach(key => {
+                    const el = preSelectedMap.get(key).el;
+                    if (!matchPeriod(el) || !matchGroup(el)) {
+                        preSelectedMap.delete(key);
+                        changed = true;
+                    }
+                });
+                if (changed) updatePreSelection();
+            }
+            applyVisibility();
+        }
+        periodSelect.addEventListener('change', onFilterChange);
+        groupSelect.addEventListener('change', onFilterChange);
+
+        function updatePreSelection() {
+            allBars.forEach(bar => {
+                const elName = bar.userData.el.s;
+                if (preSelectedMap.has(elName)) {
+                    bar.material.emissive = new THREE.Color(0x003399);
+                } else {
+                    bar.material.emissive = new THREE.Color(0x000000);
+                }
+                bar.material.needsUpdate = true;
+            });
+            confirmBtn.textContent = `确认筛选 (${preSelectedMap.size})`;
+            selectedListEl.textContent = Array.from(preSelectedMap.keys()).join(', ');
+            selectedInfoBox.style.display = preSelectedMap.size > 0 ? 'block' : 'none';
+        }
+
+        // 拾取：射线优先，触屏再叠一层屏幕空间 fallback（手指点粗）
+        function doPickAndToggle(clientX, clientY) {
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const visibleBars = allBars.filter(b => b.visible);
+            const intersects = raycaster.intersectObjects(visibleBars);
+
+            let clickedEl = null;
+            if (intersects.length > 0) {
+                clickedEl = intersects[0].object.userData.el;
+            } else {
+                const v = new THREE.Vector3();
+                let best = null;
+                let bestDist = 40;
+                visibleBars.forEach(bar => {
+                    v.set(bar.position.x, bar.position.y * 2, bar.position.z);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = bar; }
+                });
+                if (best) clickedEl = best.userData.el;
+            }
+
+            if (!clickedEl) return;
+
+            if (preSelectedMap.has(clickedEl.s)) {
+                preSelectedMap.delete(clickedEl.s);
+            } else {
+                preSelectedMap.set(clickedEl.s, { el: clickedEl });
+            }
+            updatePreSelection();
+        }
+
+        // =========================================================
+        // 触屏 / 鼠标 点击识别
+        // =========================================================
+        const activePointers = new Set();
+        let tapStart = null;
+
+        function moveThresholdFor(pointerType) {
+            return pointerType === 'mouse' ? 6 : 12;
+        }
+        const TAP_MAX_DURATION = 500;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                tapStart = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch'
+                };
+            } else {
+                tapStart = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!tapStart || activePointers.size !== 1) return;
+            const dx = e.clientX - tapStart.x;
+            const dy = e.clientY - tapStart.y;
+            const thr = moveThresholdFor(e.pointerType || tapStart.pointerType);
+            if (dx * dx + dy * dy > thr * thr) tapStart = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const pointerCountBeforeUp = activePointers.size;
+            if (tapStart && pointerCountBeforeUp === 1 && !isConfirmed) {
+                const elapsed = performance.now() - tapStart.t;
+                const dx = e.clientX - tapStart.x;
+                const dy = e.clientY - tapStart.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const thr = moveThresholdFor(e.pointerType || tapStart.pointerType);
+                if (dist <= thr && elapsed <= TAP_MAX_DURATION) {
+                    doPickAndToggle(e.clientX, e.clientY);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            tapStart = null;
+        });
+
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            if (preSelectedMap.size === 0) return;
+            isConfirmed = true;
+            applyVisibility();
+            selectedInfoBox.style.display = 'none';
+            confirmNotice.style.display = 'block';
+        });
+
+        resetAllBtn.addEventListener('click', () => {
+            preSelectedMap.clear();
+            isConfirmed = false;
+            periodFilter = 0;
+            groupFilter = 0;
+            periodSelect.value = '0';
+            groupSelect.value = '0';
+
+            allBars.forEach(bar => {
+                bar.material.emissive = new THREE.Color(0x000000);
+                bar.material.opacity = 1.0;
+            });
+            applyVisibility();
+            confirmNotice.style.display = 'none';
+            updatePreSelection();
+        });
+
+        // =========================================================
+        // 原子 / 离子 切换
+        // =========================================================
+        const toggle = document.getElementById('radiusToggle');
+        const switchLabel = document.getElementById('switchLabel');
+        const switchLabelRight = document.getElementById('switchLabelRight');
+
+        function updateRadiusState(isIon) {
+            isIonMode = isIon;
+            allBars.forEach(bar => {
+                const { el, scaleHeight } = bar.userData;
+                const finalRadius = isIon ? el.ion : el.atom;
+                const height = finalRadius * scaleHeight;
+                bar.geometry.dispose();
+                bar.geometry = new THREE.BoxGeometry(1.6, height, 1.6);
+                bar.position.y = height / 2;
+                bar.material.color.set(getColor(el, isIon));
+                bar.material.needsUpdate = true;
+            });
+            allLabels.forEach(labelObj => {
+                const { el, scaleHeight } = labelObj.userData;
+                const finalRadius = isIon ? el.ion : el.atom;
+                const height = finalRadius * scaleHeight;
+                const elementDiv = labelObj.element.querySelector('.element');
+                const valueDiv = labelObj.element.querySelector('.value');
+                if (isIon && el.ionCharge) {
+                    elementDiv.textContent = el.ionCharge;
+                } else {
+                    elementDiv.textContent = el.s;
+                }
+                valueDiv.textContent = finalRadius.toFixed(3);
+                labelObj.position.y = height + 0.3;
+            });
+            if (isIon) {
+                switchLabel.style.color = 'rgba(255,255,255,0.4)';
+                switchLabelRight.style.color = '#fff';
+            } else {
+                switchLabel.style.color = '#fff';
+                switchLabelRight.style.color = 'rgba(255,255,255,0.4)';
+            }
+        }
+        toggle.addEventListener('change', (e) => updateRadiusState(e.target.checked));
+
+        // =========================================================
+        // 初始化 + 窗口变化
+        // =========================================================
+        updateRadiusState(false);
+        applyVisibility();
+        applyOrientationCamera(false);   // 首帧直接落位
+
+        let resizeTimer = null;
+        function scheduleOrientationUpdate() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                labelRenderer.setSize(window.innerWidth, window.innerHeight);
+                applyOrientationCamera(true);
+            }, 60);
+        }
+
+        window.addEventListener('resize', scheduleOrientationUpdate);
+        window.addEventListener('orientationchange', () => {
+            // 等系统 UI（状态栏、地址栏）动画完成后再测量
+            setTimeout(scheduleOrientationUpdate, 300);
+        });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', scheduleOrientationUpdate);
+        }
+
+        // =========================================================
+        // 动画循环
+        // =========================================================
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 相机缓动（横竖屏切换时）
+            if (camTween) {
+                const t = Math.min(1, (performance.now() - camTween.start) / camTween.duration);
+                const e = t * t * (3 - 2 * t); // smoothstep
+                camera.position.lerpVectors(camTween.fromPos, camTween.toPos, e);
+                controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, e);
+                camera.fov = camTween.fromFov + (camTween.toFov - camTween.fromFov) * e;
+                camera.zoom = camTween.fromZoom + (camTween.toZoom - camTween.fromZoom) * e;
+                camera.updateProjectionMatrix();
+                camera.lookAt(controls.target);
+                if (t >= 1) camTween = null;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

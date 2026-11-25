@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CsCl 晶胞 (深绿Cl⁻, 深红Cs⁺) · 黑灰棱 · 360°旋转</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 引入 Three.js 核心库和轨道控制器 -->
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff); // 白色背景
+
+        // --- 相机设置 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(2.8, 2.0, 4.0);
+        camera.lookAt(0.5, 0.5, 0.5);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 光照系统: 创造高光效果，同时保持整体明亮 ---
+        // 环境光 - 基础照明
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        // 主光源1：强方向光从右上，创造强烈高光
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+        light1.position.set(3.0, 4.0, 3.0);
+        scene.add(light1);
+
+        // 主光源2：补光从左下，减少阴影过深
+        const light2 = new THREE.DirectionalLight(0xffffff, 0.7);
+        light2.position.set(-2.5, 1.5, -2.0);
+        scene.add(light2);
+
+        // 背光
+        const light3 = new THREE.DirectionalLight(0xffffff, 0.5);
+        light3.position.set(-1.0, 1.5, -4.0);
+        scene.add(light3);
+
+        // 点光源从内部照亮，增强高光
+        const pointLight1 = new THREE.PointLight(0xffffff, 0.7);
+        pointLight1.position.set(0.5, 0.5, 0.5); // 体心位置，让中心离子更亮
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xffffff, 0.5);
+        pointLight2.position.set(0.2, 0.2, 0.2);
+        scene.add(pointLight2);
+
+        const pointLight3 = new THREE.PointLight(0xffffff, 0.4);
+        pointLight3.position.set(1.2, 0.3, 1.2);
+        scene.add(pointLight3);
+
+        // 增加一个从下方打光的光源，让底部离子也清晰
+        const bottomLight = new THREE.PointLight(0xffffff, 0.3);
+        bottomLight.position.set(0.5, -0.5, 0.5);
+        scene.add(bottomLight);
+
+        // --- 轨道控制器 (无自动旋转，允许360度纵向旋转) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.target.set(0.5, 0.5, 0.5);
+        
+        // 允许360度纵向旋转
+        controls.maxPolarAngle = Math.PI;
+        
+        controls.minDistance = 2.0;
+        controls.maxDistance = 8.0;
+
+        // --- 黑灰色棱边 ---
+        const edgeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x333333,        // 黑灰色
+            roughness: 0.5,
+            metalness: 0.0
+        });
+        
+        const edgeRadius = 0.018; // 适中粗细
+
+        function addEdge(x1, y1, z1, x2, y2, z2) {
+            const start = new THREE.Vector3(x1, y1, z1);
+            const end = new THREE.Vector3(x2, y2, z2);
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(edgeRadius, edgeRadius, length, 10),
+                edgeMaterial
+            );
+            
+            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            cylinder.position.copy(midPoint);
+            
+            cylinder.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                direction.clone().normalize()
+            );
+            
+            scene.add(cylinder);
+        }
+
+        // 绘制12条棱
+        // 底面
+        addEdge(0,0,0, 1,0,0);
+        addEdge(1,0,0, 1,0,1);
+        addEdge(1,0,1, 0,0,1);
+        addEdge(0,0,1, 0,0,0);
+        // 顶面
+        addEdge(0,1,0, 1,1,0);
+        addEdge(1,1,0, 1,1,1);
+        addEdge(1,1,1, 0,1,1);
+        addEdge(0,1,1, 0,1,0);
+        // 垂直棱
+        addEdge(0,0,0, 0,1,0);
+        addEdge(1,0,0, 1,1,0);
+        addEdge(1,0,1, 1,1,1);
+        addEdge(0,0,1, 0,1,1);
+
+        // --- 离子材质 ---
+        // 氯离子 - 深绿色，带高光
+        const greenMaterial = new THREE.MeshStandardMaterial({
+            color: 0x0a3d0a,        // 深绿色
+            roughness: 0.25,
+            metalness: 0.1,
+            emissive: 0x000000
+        });
+        
+        // 铯离子 - 深红色 (暗红色，带高光)
+        const redMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8b1a1a,        // 深红色
+            roughness: 0.25,
+            metalness: 0.1,
+            emissive: 0x000000
+        });
+
+        // 添加球体函数
+        function addSphere(posX, posY, posZ, material, radius) {
+            const geometry = new THREE.SphereGeometry(radius, 64, 32);
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.set(posX, posY, posZ);
+            scene.add(sphere);
+        }
+
+        // 离子半径
+        const clRadius = 0.2;   // 氯离子 (深绿色)
+        const csRadius = 0.18;  // 铯离子 (深红色)
+
+        // --- 八个角顶的氯离子 ---
+        const corners = [
+            [0,0,0], [1,0,0], [0,1,0], [0,0,1],
+            [1,1,0], [1,0,1], [0,1,1], [1,1,1]
+        ];
+        corners.forEach(pos => addSphere(pos[0], pos[1], pos[2], greenMaterial, clRadius));
+
+        // --- 体心的铯离子 (深红色) ---
+        addSphere(0.5, 0.5, 0.5, redMaterial, csRadius);
+
+        // --- 确保没有任何网格被添加到场景中 ---
+        // 不添加任何 GridHelper 或 AxesHelper
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+
+        // --- 窗口自适应 ---
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

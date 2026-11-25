@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>乙炔 (C₂H₂) - 加长键 - 白底灰键</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #ffffff; }
+    </style>
+
+    <!-- 引入 Three.js 核心库和轨道控制器 -->
+    </head>
+<body>
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 (白色背景) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // --- 原子位置定义 (键长加长) ---
+        // 乙炔是直线型分子 HC≡CH
+        // 加长后键长：C≡C=1.60, C-H=1.40 (与系列模型保持一致)
+        const bondLengthCC = 1.60;  // 碳碳三键
+        const bondLengthCH = 1.40;  // 碳氢键
+        
+        // 碳原子位置
+        const c1Pos = new THREE.Vector3(0, 0, -bondLengthCC/2);  // 左侧碳
+        const c2Pos = new THREE.Vector3(0, 0, bondLengthCC/2);   // 右侧碳
+        const ccMidPoint = new THREE.Vector3(0, 0, 0); // 碳碳键中点
+        
+        // 氢原子位置
+        const h1Pos = new THREE.Vector3(0, 0, -bondLengthCC/2 - bondLengthCH); // 左侧氢
+        const h2Pos = new THREE.Vector3(0, 0, bondLengthCC/2 + bondLengthCH);  // 右侧氢
+
+        // --- 相机设置 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(4, 2.5, 6);
+        camera.lookAt(ccMidPoint);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(ccMidPoint);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableGrid = false;
+        controls.enableAxesHelper = false;
+        controls.update();
+
+        // --- 光照 (适应白色背景) ---
+        const ambientLight = new THREE.AmbientLight(0x888888);
+        scene.add(ambientLight);
+
+        const light1 = new THREE.PointLight(0xffffff, 1.4);
+        light1.position.set(4, 6, 5);
+        scene.add(light1);
+
+        const light2 = new THREE.PointLight(0xffffff, 1.2);
+        light2.position.set(-4, 3, 6);
+        scene.add(light2);
+
+        const light3 = new THREE.PointLight(0xffffff, 1.0);
+        light3.position.set(0, -5, 5);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 1.1);
+        light4.position.set(3, 4, -5);
+        scene.add(light4);
+
+        const light5 = new THREE.DirectionalLight(0xffffff, 0.8);
+        light5.position.set(2, 3, 4);
+        scene.add(light5);
+
+        // --- 原子参数 (统一系列风格) ---
+        const rC = 0.5;           // 碳半径
+        const rH = 0.3;           // 氢半径
+        
+        const cColor = 0x000000;   // 纯黑碳
+        const hColor = 0x3366cc;   // 深蓝氢
+        
+        // 材质
+        const carbonMat = new THREE.MeshStandardMaterial({ color: cColor, roughness: 0.2, metalness: 0.05 });
+        const hMat = new THREE.MeshStandardMaterial({ color: hColor, roughness: 0.2, metalness: 0.0 });
+        const bondMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3, metalness: 0.0 }); // 灰色键
+        const tripleBondMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3, metalness: 0.0 });
+
+        // --- 碳原子 ---
+        const carbon1 = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 32), carbonMat);
+        carbon1.position.copy(c1Pos);
+        scene.add(carbon1);
+        
+        const carbon2 = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 32), carbonMat);
+        carbon2.position.copy(c2Pos);
+        scene.add(carbon2);
+
+        // --- 氢原子 (深蓝) ---
+        const hydrogen1 = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 24), hMat);
+        hydrogen1.position.copy(h1Pos);
+        scene.add(hydrogen1);
+        
+        const hydrogen2 = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 24), hMat);
+        hydrogen2.position.copy(h2Pos);
+        scene.add(hydrogen2);
+
+        // --- 碳碳三键 (三根平行的灰色圆柱，互为120°分布) ---
+        const ccAxis = new THREE.Vector3(0, 0, 1); // 方向沿Z轴
+        
+        const angles = [0, 120, 240].map(deg => deg * Math.PI / 180);
+        const offset = 0.18; // 偏移量稍大，使三根键清晰可辨
+        
+        angles.forEach(angle => {
+            const dir = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+            
+            const ccBond = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, bondLengthCC, 12), tripleBondMat);
+            ccBond.position.copy(dir.clone().multiplyScalar(offset));
+            ccBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ccAxis);
+            scene.add(ccBond);
+        });
+
+        // --- C-H 键 (单键，灰色) ---
+        
+        // 左侧C-H键
+        const chBond1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, bondLengthCH, 12), bondMat);
+        chBond1.position.copy(new THREE.Vector3(0, 0, -bondLengthCC/2 - bondLengthCH/2));
+        chBond1.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1));
+        scene.add(chBond1);
+        
+        // 右侧C-H键
+        const chBond2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, bondLengthCH, 12), bondMat);
+        chBond2.position.copy(new THREE.Vector3(0, 0, bondLengthCC/2 + bondLengthCH/2));
+        chBond2.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+        scene.add(chBond2);
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- 窗口自适应 ---
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        console.log('乙炔 C2H2 - 键长加长，纯黑碳，深蓝氢，灰键，白底');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

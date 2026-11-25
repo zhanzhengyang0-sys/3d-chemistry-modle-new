@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D 元素周期表 - 字体放大版</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #f4f6f8; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        #info {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 6px 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            pointer-events: none;
+            z-index: 100;
+            font-size: 13px;
+            border-left: 4px solid #4CAF50;
+            color: #333;
+            white-space: nowrap;
+        }
+        .instruction {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* 【核心修改】放大文字 */
+        .label-3d {
+            color: #111;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+            pointer-events: none;
+            user-select: none;
+            text-align: center;
+        }
+        .label-3d .element { font-size: 14px; } /* 12px -> 14px */
+        .label-3d .value { font-size: 11px; font-weight: normal; } /* 9px -> 11px */
+
+        #legend {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            pointer-events: none;
+            font-size: 12px;
+            color: #333;
+        }
+        #legend .row {
+            display: flex;
+            align-items: center;
+            margin: 4px 0;
+        }
+        #legend .box {
+            width: 20px;
+            height: 15px;
+            margin-right: 8px;
+            border: 1px solid #ccc;
+        }
+    </style>
+
+    </head>
+<body>
+    <div id="info">🔬 图1-3-5 元素的电负性 (字体放大版)</div>
+    <div class="instruction">🖱️ 拖拽旋转 | 滚轮缩放</div>
+
+    <div id="legend">
+        <div class="row"><div class="box" style="background: #DCEDC8;"></div> 0.7 – 1.4</div>
+        <div class="row"><div class="box" style="background: #81C784;"></div> 1.5 – 1.9</div>
+        <div class="row"><div class="box" style="background: #43A047;"></div> 2.0 – 2.9</div>
+        <div class="row"><div class="box" style="background: #1B5E20;"></div> 3.0 – 4.0</div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // ==========================================
+        // 数据完全正确
+        // ==========================================
+        const elementsData = [
+            { r: 1, g: 1,  s: 'H',  v: 2.1 }, 
+            { r: 1, g: 18, s: 'He', v: 0 },
+
+            { r: 2, g: 1,  s: 'Li', v: 1.0 }, { r: 2, g: 2,  s: 'Be', v: 1.5 },
+            { r: 2, g: 13, s: 'B',  v: 2.0 }, { r: 2, g: 14, s: 'C',  v: 2.5 },
+            { r: 2, g: 15, s: 'N',  v: 3.0 }, { r: 2, g: 16, s: 'O',  v: 3.5 },
+            { r: 2, g: 17, s: 'F',  v: 4.0 }, { r: 2, g: 18, s: 'Ne', v: 0 },
+
+            { r: 3, g: 1,  s: 'Na', v: 0.9 }, { r: 3, g: 2,  s: 'Mg', v: 1.2 },
+            { r: 3, g: 13, s: 'Al', v: 1.5 }, { r: 3, g: 14, s: 'Si', v: 1.8 },
+            { r: 3, g: 15, s: 'P',  v: 2.1 }, { r: 3, g: 16, s: 'S',  v: 2.5 },
+            { r: 3, g: 17, s: 'Cl', v: 3.0 }, { r: 3, g: 18, s: 'Ar', v: 0 },
+
+            { r: 4, g: 1,  s: 'K',  v: 0.8 }, { r: 4, g: 2,  s: 'Ca', v: 1.0 },
+            { r: 4, g: 3,  s: 'Sc', v: 1.3 }, { r: 4, g: 4,  s: 'Ti', v: 1.5 },
+            { r: 4, g: 5,  s: 'V',  v: 1.6 }, { r: 4, g: 6,  s: 'Cr', v: 1.6 },
+            { r: 4, g: 7,  s: 'Mn', v: 1.5 }, { r: 4, g: 8,  s: 'Fe', v: 1.8 },
+            { r: 4, g: 9,  s: 'Co', v: 1.8 }, { r: 4, g: 10, s: 'Ni', v: 1.8 },
+            { r: 4, g: 11, s: 'Cu', v: 1.9 }, { r: 4, g: 12, s: 'Zn', v: 1.6 },
+            { r: 4, g: 13, s: 'Ga', v: 1.6 }, { r: 4, g: 14, s: 'Ge', v: 2.0 },
+            { r: 4, g: 15, s: 'As', v: 2.2 }, { r: 4, g: 16, s: 'Se', v: 2.4 },
+            { r: 4, g: 17, s: 'Br', v: 2.8 }, { r: 4, g: 18, s: 'Kr', v: 0 },
+
+            { r: 5, g: 1,  s: 'Rb', v: 0.8 }, { r: 5, g: 2,  s: 'Sr', v: 1.0 },
+            { r: 5, g: 3,  s: 'Y',  v: 1.2 }, { r: 5, g: 4,  s: 'Zr', v: 1.3 },
+            { r: 5, g: 5,  s: 'Nb', v: 1.6 }, { r: 5, g: 6,  s: 'Mo', v: 1.6 },
+            { r: 5, g: 7,  s: 'Tc', v: 1.9 }, { r: 5, g: 8,  s: 'Ru', v: 2.2 },
+            { r: 5, g: 9,  s: 'Rh', v: 2.2 }, { r: 5, g: 10, s: 'Pd', v: 2.2 },
+            { r: 5, g: 11, s: 'Ag', v: 1.9 }, { r: 5, g: 12, s: 'Cd', v: 1.7 },
+            { r: 5, g: 13, s: 'In', v: 1.7 }, { r: 5, g: 14, s: 'Sn', v: 1.9 },
+            { r: 5, g: 15, s: 'Sb', v: 2.0 }, { r: 5, g: 16, s: 'Te', v: 2.1 },
+            { r: 5, g: 17, s: 'I',  v: 2.6 }, { r: 5, g: 18, s: 'Xe', v: 0 },
+
+            { r: 6, g: 1,  s: 'Cs', v: 0.7 }, { r: 6, g: 2,  s: 'Ba', v: 0.9 },
+            { r: 6, g: 3,  s: 'La', v: 1.1 }, { r: 6, g: 4,  s: 'Hf', v: 1.3 },
+            { r: 6, g: 5,  s: 'Ta', v: 1.5 }, { r: 6, g: 6,  s: 'W',  v: 1.7 },
+            { r: 6, g: 7,  s: 'Re', v: 1.9 }, { r: 6, g: 8,  s: 'Os', v: 2.2 },
+            { r: 6, g: 9,  s: 'Ir', v: 2.2 },
+            { r: 6, g: 10, s: 'Pt', v: 2.2 },
+            { r: 6, g: 11, s: 'Au', v: 2.4 }, { r: 6, g: 12, s: 'Hg', v: 1.9 },
+            { r: 6, g: 13, s: 'Tl', v: 1.8 }, { r: 6, g: 14, s: 'Pb', v: 1.9 },
+            { r: 6, g: 15, s: 'Bi', v: 2.0 }, { r: 6, g: 16, s: 'Po', v: 2.0 },
+            { r: 6, g: 17, s: 'At', v: 2.2 }, { r: 6, g: 18, s: 'Rn', v: 0 },
+
+            { r: 7, g: 1,  s: 'Fr', v: 0.7 }, { r: 7, g: 2,  s: 'Ra', v: 0.9 },
+            { r: 7, g: 3,  s: 'Ac', v: 1.1 },
+
+            { r: 8, g: 3,  s: 'Ce', v: 1.1 }, { r: 8, g: 4,  s: 'Pr', v: 1.1 },
+            { r: 8, g: 5,  s: 'Nd', v: 1.2 }, { r: 8, g: 6,  s: 'Pm', v: 1.1 },
+            { r: 8, g: 7,  s: 'Sm', v: 1.2 }, { r: 8, g: 8,  s: 'Eu', v: 1.1 },
+            { r: 8, g: 9,  s: 'Gd', v: 1.2 }, { r: 8, g: 10, s: 'Tb', v: 1.2 },
+            { r: 8, g: 11, s: 'Dy', v: 1.2 }, { r: 8, g: 12, s: 'Ho', v: 1.2 },
+            { r: 8, g: 13, s: 'Er', v: 1.2 }, { r: 8, g: 14, s: 'Tm', v: 1.2 },
+            { r: 8, g: 15, s: 'Yb', v: 1.2 }, { r: 8, g: 16, s: 'Lu', v: 1.3 },
+
+            { r: 9, g: 3,  s: 'Th', v: 1.3 }, { r: 9, g: 4,  s: 'Pa', v: 1.5 },
+            { r: 9, g: 5,  s: 'U',  v: 1.7 }, { r: 9, g: 6,  s: 'Np', v: 1.3 },
+            { r: 9, g: 7,  s: 'Pu', v: 1.3 }, { r: 9, g: 8,  s: 'Am', v: 1.3 },
+            { r: 9, g: 9,  s: 'Cm', v: 1.3 }, { r: 9, g: 10, s: 'Bk', v: 1.3 },
+            { r: 9, g: 11, s: 'Cf', v: 1.3 }, { r: 9, g: 12, s: 'Es', v: 1.3 },
+            { r: 9, g: 13, s: 'Fm', v: 1.3 }, { r: 9, g: 14, s: 'Md', v: 1.3 },
+            { r: 9, g: 15, s: 'No', v: 1.5 }, { r: 9, g: 16, s: 'Lr', v: 1.3 }
+        ];
+
+        function getColor(val) {
+            if (val === 0) return '#cccccc'; 
+            if (val <= 1.4) return '#DCEDC8'; 
+            if (val <= 1.9) return '#81C784'; 
+            if (val <= 2.9) return '#43A047'; 
+            return '#1B5E20'; 
+        }
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf4f6f8);
+
+        const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 2000);
+        camera.position.set(-28, 28, -30); 
+        camera.lookAt(0, 4, 0);
+        camera.zoom = 0.75; 
+        camera.updateProjectionMatrix();
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.target.set(0, 3, 2);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(-20, 40, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const floorMat = new THREE.MeshBasicMaterial({
+            color: 0x93c5fd,
+            transparent: true,
+            opacity: 0.25,
+            side: THREE.DoubleSide
+        });
+        const floorGeo = new THREE.PlaneGeometry(38, 24); 
+        const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+        floorMesh.position.set(0, -0.05, -3.0); 
+        floorMesh.rotation.x = -Math.PI / 2;
+        floorMesh.receiveShadow = true;
+        scene.add(floorMesh);
+
+        const scaleHeight = 1.6; 
+        const spacing = 1.9;     
+        
+        const gridMap = new Map();
+        elementsData.forEach(el => {
+            const key = `${el.r}_${el.g}`;
+            gridMap.set(key, el);
+        });
+
+        const offsetX = -(9.5 * spacing); 
+
+        for (let r = 1; r <= 9; r++) {
+            for (let g = 1; g <= 18; g++) {
+                
+                if (g === 18) continue;
+
+                const key = `${r}_${g}`;
+                const el = gridMap.get(key);
+                if (!el) continue;
+
+                const posX = (18 - g + 1) * spacing;
+                const finalPosX = posX + offsetX;
+                
+                let posZ = (r - 3.5) * -spacing; 
+                if (r === 8) posZ = (7 - 3.5) * -spacing - spacing * 1.5; 
+                if (r === 9) posZ = (7 - 3.5) * -spacing - spacing * 2.5; 
+                
+                const height = el.v * scaleHeight;
+                const hexColor = getColor(el.v);
+
+                const geometry = new THREE.BoxGeometry(1.6, height, 1.6);
+                const material = new THREE.MeshStandardMaterial({ color: hexColor, roughness: 0.3, metalness: 0.1 });
+                const bar = new THREE.Mesh(geometry, material);
+                bar.castShadow = true;
+                bar.receiveShadow = true;
+                bar.position.set(finalPosX, height / 2, posZ);
+                scene.add(bar);
+
+                if (el.v !== 0) {
+                    const div = document.createElement('div');
+                    div.className = 'label-3d';
+                    div.innerHTML = `<div class="element">${el.s}</div><div class="value">${el.v.toFixed(1)}</div>`;
+                    const label = new CSS2DObject(div);
+                    label.position.set(finalPosX, height + 0.5, posZ); // 稍微提升一点间距
+                    scene.add(label);
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 300));
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>甲醛 (H₂CO) - 白底黑键 黑色碳 蓝色氢 360°视角</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: white; }
+    </style>
+
+    <!-- 引入 Three.js 核心库和轨道控制器 -->
+    </head>
+<body>
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 (白色背景) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // ===== 原子位置定义 (平面三角形，Z=0) =====
+        // 键长: C=O 保持不变 1.60； C-H 1.70 (加长)
+        const bondLengthCO = 1.60;  
+        const bondLengthCH = 1.70;  // 加长碳氢键
+        
+        // 碳原子位于原点
+        const cPos = new THREE.Vector3(0, 0, 0);
+        
+        // 氧原子沿X轴正方向 (0°)
+        const oPos = new THREE.Vector3(bondLengthCO, 0, 0);
+        
+        // 两个氢原子，与C=O键夹角120°和240° (平面三角形)
+        const angle1 = 120 * Math.PI / 180;   // 120°
+        const angle2 = 240 * Math.PI / 180;   // 240°
+        
+        const h1Pos = new THREE.Vector3(
+            bondLengthCH * Math.cos(angle1),
+            bondLengthCH * Math.sin(angle1),
+            0
+        );
+        
+        const h2Pos = new THREE.Vector3(
+            bondLengthCH * Math.cos(angle2),
+            bondLengthCH * Math.sin(angle2),
+            0
+        );
+
+        // 分子中心 (原点)
+        const centerPos = new THREE.Vector3(0, 0, 0);
+
+        // --- 相机设置 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5.0, 3.5, 7.0); 
+        camera.lookAt(centerPos);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器 (360度纵向旋转) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(centerPos);
+        controls.enableDamping = true;      // 启用惯性
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.rotateSpeed = 1.2;
+        // 关键：允许纵向360度旋转 (默认是0到180度，放宽限制即可)
+        controls.minPolarAngle = 0;          // 0度 (从上往下看)
+        controls.maxPolarAngle = Math.PI;    // 180度 (从下往上看)，实际就是360度包含所有角度
+        controls.update();
+
+        // --- 光照 (适应白底，保证原子和键清晰) ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // 环境光增强，因为背景白
+        scene.add(ambientLight);
+
+        // 主光源1 (产生立体感)
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+        light1.position.set(3, 5, 5);
+        scene.add(light1);
+        
+        // 主光源2 (反向补充)
+        const light2 = new THREE.DirectionalLight(0xffffff, 0.9);
+        light2.position.set(-4, 3, -4);
+        scene.add(light2);
+        
+        // 点光源补充细节
+        const light3 = new THREE.PointLight(0xffffff, 0.6);
+        light3.position.set(2, 2, 3);
+        scene.add(light3);
+        
+        const light4 = new THREE.PointLight(0xffffff, 0.5);
+        light4.position.set(-2, -2, 4);
+        scene.add(light4);
+
+        // --- 原子半径和颜色 (根据要求) ---
+        const rC = 0.5;
+        const rH = 0.3;
+        const rO = 0.45;
+        
+        const cColor = 0x000000;      // 碳: 纯黑
+        const hColor = 0x3366cc;      // 氢: 亮蓝色
+        const oColor = 0xff3333;      // 氧: 鲜红色
+        
+        // 键的颜色改为黑灰色 (暗一些的灰色)
+        const bondColor = 0x444444;    // 黑灰色
+        const doubleBondColor = 0x444444; // 双键也用同色，但可以稍微区分？保持统一黑灰色
+
+        // 材质 (无金属感，适中的粗糙度)
+        const carbonMat = new THREE.MeshPhongMaterial({ color: cColor, shininess: 40, specular: 0x222222 });
+        const hMat = new THREE.MeshPhongMaterial({ color: hColor, shininess: 45, specular: 0x333333 });
+        const oMat = new THREE.MeshPhongMaterial({ color: oColor, shininess: 45, specular: 0x444444 });
+        const bondMat = new THREE.MeshPhongMaterial({ color: bondColor, shininess: 30, specular: 0x222222 });
+        const doubleBondMat = new THREE.MeshPhongMaterial({ color: doubleBondColor, shininess: 30, specular: 0x222222 }); // 同色
+
+        // 几何体
+        const sphereGeomC = new THREE.SphereGeometry(rC, 64, 32);
+        const sphereGeomH = new THREE.SphereGeometry(rH, 48, 24);
+        const sphereGeomO = new THREE.SphereGeometry(rO, 48, 24);
+        const cylinderGeom = new THREE.CylinderGeometry(0.07, 0.07, 1, 10); // 稍粗的键，更明显
+
+        // --- 组装原子 ---
+        
+        // 碳 (中心)
+        const carbon = new THREE.Mesh(sphereGeomC, carbonMat);
+        carbon.position.copy(cPos);
+        scene.add(carbon);
+
+        // 氧
+        const oxygen = new THREE.Mesh(sphereGeomO, oMat);
+        oxygen.position.copy(oPos);
+        scene.add(oxygen);
+
+        // 氢1
+        const hydrogen1 = new THREE.Mesh(sphereGeomH, hMat);
+        hydrogen1.position.copy(h1Pos);
+        scene.add(hydrogen1);
+        
+        // 氢2
+        const hydrogen2 = new THREE.Mesh(sphereGeomH, hMat);
+        hydrogen2.position.copy(h2Pos);
+        scene.add(hydrogen2);
+
+        // --- 碳氧双键 (用两根平行的圆柱，偏移方向垂直于分子平面，即Z轴) ---
+        const coAxis = oPos.clone().normalize(); // 方向从C到O
+        const perp = new THREE.Vector3(0, 0, 1); // 垂直XY平面的单位向量
+        
+        const offset = 0.13; // 双键间距
+        
+        // 第一根键 (+Z方向偏移)
+        const coBond1 = new THREE.Mesh(cylinderGeom, doubleBondMat);
+        coBond1.position.copy(oPos.clone().multiplyScalar(0.5).add(perp.clone().multiplyScalar(offset)));
+        coBond1.scale.set(1, bondLengthCO, 1);
+        coBond1.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), coAxis);
+        scene.add(coBond1);
+        
+        // 第二根键 (-Z方向偏移)
+        const coBond2 = new THREE.Mesh(cylinderGeom, doubleBondMat);
+        coBond2.position.copy(oPos.clone().multiplyScalar(0.5).sub(perp.clone().multiplyScalar(offset)));
+        coBond2.scale.set(1, bondLengthCO, 1);
+        coBond2.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), coAxis);
+        scene.add(coBond2);
+
+        // --- C-H 键 (单键，加长后) ---
+        
+        // C-H1 键
+        const h1Dir = h1Pos.clone().normalize();
+        const chBond1 = new THREE.Mesh(cylinderGeom, bondMat);
+        chBond1.position.copy(h1Pos.clone().multiplyScalar(0.5));
+        chBond1.scale.set(1, bondLengthCH, 1);
+        chBond1.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), h1Dir);
+        scene.add(chBond1);
+        
+        // C-H2 键
+        const h2Dir = h2Pos.clone().normalize();
+        const chBond2 = new THREE.Mesh(cylinderGeom, bondMat);
+        chBond2.position.copy(h2Pos.clone().multiplyScalar(0.5));
+        chBond2.scale.set(1, bondLengthCH, 1);
+        chBond2.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), h2Dir);
+        scene.add(chBond2);
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update(); // 更新控制器（含阻尼效果）
+            
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- 窗口自适应 ---
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

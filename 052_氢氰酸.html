@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>氢氰酸 (HCN) - 直线型三键 - 白底灰键</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #ffffff; }
+    </style>
+
+    <!-- 引入 Three.js 核心库和轨道控制器 -->
+    </head>
+<body>
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景、相机、渲染器 (白色背景) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // --- 原子位置定义 (直线型 H-C≡N，沿Z轴排列) ---
+        const bondLengthCH = 1.70;  // H-C 键长
+        const bondLengthCN = 1.60;  // C≡N 三键键长
+        
+        // 将分子中心放在原点
+        const totalLength = bondLengthCH + bondLengthCN;
+        const hPos = new THREE.Vector3(0, 0, -totalLength/2);               // 氢 (左)
+        const cPos = new THREE.Vector3(0, 0, -totalLength/2 + bondLengthCH); // 碳 (中)
+        const nPos = new THREE.Vector3(0, 0, totalLength/2);                // 氮 (右)
+        
+        const centerPos = new THREE.Vector3(0, 0, 0); // 分子中心
+
+        // --- 相机设置 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(4, 3, 6);
+        camera.lookAt(centerPos);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器 (目标点设置为分子中心) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(centerPos);
+        controls.enableDamping = true;      // 启用阻尼使旋转更平滑
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableGrid = false;
+        controls.enableZoom = true;
+        controls.update();
+
+        // --- 光照 (明亮且均匀，以适应白色背景) ---
+        const ambientLight = new THREE.AmbientLight(0x888888); // 适中的环境光
+        scene.add(ambientLight);
+
+        // 主光源从多个方向照射，避免阴影过重
+        const light1 = new THREE.PointLight(0xffffff, 1.5);
+        light1.position.set(5, 5, 5);
+        scene.add(light1);
+
+        const light2 = new THREE.PointLight(0xffffff, 1.3);
+        light2.position.set(-5, 3, 5);
+        scene.add(light2);
+
+        const light3 = new THREE.PointLight(0xffffff, 1.0);
+        light3.position.set(0, -5, 5);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 1.2);
+        light4.position.set(0, 4, -5);
+        scene.add(light4);
+
+        const light5 = new THREE.DirectionalLight(0xffffff, 0.8);
+        light5.position.set(2, 3, 4);
+        scene.add(light5);
+
+        // --- 原子参数 ---
+        const rH = 0.3;
+        const rC = 0.5;      // 碳原子半径稍大
+        const rN = 0.45;      // 氮原子略小于碳
+        
+        // 颜色：碳纯黑，氢蓝色，氮黄色
+        const hColor = 0x3366cc;   // 蓝色 (深一些，在白底上更明显)
+        const cColor = 0x000000;   // 纯黑碳
+        const nColor = 0xffaa00;   // 黄色 (橙黄)
+        
+        // 材质 (增加光泽感，突出立体)
+        const hMat = new THREE.MeshStandardMaterial({ 
+            color: hColor, 
+            roughness: 0.2, 
+            metalness: 0.0,
+            emissive: 0x000000
+        });
+        
+        const carbonMat = new THREE.MeshStandardMaterial({ 
+            color: cColor, 
+            roughness: 0.3, 
+            metalness: 0.1,
+            emissive: 0x000000
+        });
+        
+        const nMat = new THREE.MeshStandardMaterial({ 
+            color: nColor, 
+            roughness: 0.25, 
+            metalness: 0.0,
+            emissive: 0x000000
+        });
+        
+        // 化学键材质：灰色
+        const bondMat = new THREE.MeshStandardMaterial({ 
+            color: 0x888888,      // 中灰色
+            roughness: 0.3, 
+            metalness: 0.0,
+            emissive: 0x000000
+        });
+        
+        const tripleBondMat = new THREE.MeshStandardMaterial({ 
+            color: 0x888888, 
+            roughness: 0.25, 
+            metalness: 0.0,
+            emissive: 0x000000
+        });
+
+        // --- 原子球体 ---
+        
+        // 氢原子 (左) - 蓝色
+        const hydrogen = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 24), hMat);
+        hydrogen.position.copy(hPos);
+        scene.add(hydrogen);
+        
+        // 碳原子 (中) - 纯黑
+        const carbon = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 32), carbonMat);
+        carbon.position.copy(cPos);
+        scene.add(carbon);
+        
+        // 氮原子 (右) - 黄色
+        const nitrogen = new THREE.Mesh(new THREE.SphereGeometry(rN, 48, 24), nMat);
+        nitrogen.position.copy(nPos);
+        scene.add(nitrogen);
+
+        // --- H-C 单键 (左侧) 灰色 ---
+        const axisZ = new THREE.Vector3(0, 0, 1); // 方向沿Z轴正向
+        
+        const hcBond = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.1, 0.1, bondLengthCH, 12), 
+            bondMat
+        );
+        hcBond.position.copy(new THREE.Vector3(0, 0, hPos.z + bondLengthCH/2));
+        hcBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axisZ);
+        scene.add(hcBond);
+
+        // --- C≡N 三键 (右侧) 三根灰色圆柱，互为120°分布，加粗并增大间距以增强立体感 ---
+        const cnAxis = new THREE.Vector3(0, 0, 1); // 沿Z轴正向
+        
+        // 三个方向，在XY平面内间隔120°
+        const angles = [0, 120, 240].map(deg => deg * Math.PI / 180);
+        const offset = 0.22; // 偏移量加大，使三根键更分离，立体感更强
+        const bondRadius = 0.1; // 键的半径
+        
+        angles.forEach(angle => {
+            // 偏移方向在XY平面内
+            const dir = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+            
+            const cnBond = new THREE.Mesh(
+                new THREE.CylinderGeometry(bondRadius, bondRadius, bondLengthCN, 12), 
+                tripleBondMat
+            );
+            // 位置：C和N的中点，加上垂直于键轴的偏移
+            const midPoint = new THREE.Vector3(0, 0, cPos.z + bondLengthCN/2);
+            cnBond.position.copy(midPoint.clone().add(dir.clone().multiplyScalar(offset)));
+            cnBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), cnAxis);
+            scene.add(cnBond);
+        });
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- 窗口自适应 ---
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        console.log('氢氰酸 HCN - 纯黑碳，蓝氢，黄氮，灰键，白底');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>六方最密堆积 · 晶胞显示 · 触屏适配</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: white;
+            font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        canvas { display: block; touch-action: none; }
+
+        /* ============================================================
+           控制栏：flex-wrap 自动换行，窄屏完整可见
+           ============================================================ */
+        #control-bar {
+            position: absolute;
+            bottom: max(16px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 24px;
+            padding: 8px 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            border: 0.5px solid rgba(255,255,255,0.9);
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;              /* ★ 关键：允许换行 */
+            align-items: center;
+            justify-content: center;
+            gap: 8px 14px;
+            z-index: 200;
+            pointer-events: auto;
+            line-height: 1;
+        }
+        .bar-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+            min-height: 32px;
+        }
+        .section-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e3a5f;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+        }
+
+        .ctrl-btn {
+            background: rgba(255,255,255,0.85);
+            border: 0.5px solid #b0c8e0;
+            color: #1a5e9c;
+            font-size: 18px;
+            font-weight: 500;
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            min-height: 34px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            transition: all 0.12s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            padding: 0;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .ctrl-btn:active { background: #d9e6ff; transform: scale(0.94); }
+        .ctrl-btn:disabled { opacity: 0.35; transform: none; background: #e2e8f0; pointer-events: none; }
+
+        .layer-count-badge {
+            font-size: 15px;
+            font-weight: 700;
+            min-width: 40px;
+            text-align: center;
+            color: #0b3b5e;
+        }
+
+        .color-dots {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .color-dot {
+            width: 30px;
+            height: 30px;
+            min-width: 30px;
+            min-height: 30px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.9);
+            box-shadow: 0 1px 5px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: transform 0.1s, border 0.1s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+        .color-dot:active { transform: scale(0.88); }
+        .color-dot.active-dot {
+            border: 2.5px solid #1e3a5f;
+            box-shadow: 0 0 0 2px rgba(30, 90, 150, 0.2);
+        }
+
+        .reset-chip, .toggle-switch {
+            background: rgba(255,255,255,0.7);
+            border: 0.5px solid #bdd3ff;
+            border-radius: 30px;
+            padding: 5px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a5e9c;
+            cursor: pointer;
+            transition: all 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-height: 30px;
+            box-sizing: border-box;
+            white-space: nowrap;
+        }
+        .reset-chip:active, .toggle-switch:active { background: #d9e6ff; transform: scale(0.96); }
+        .toggle-switch.active { background: #1a73e8; color: white; border-color: #1a73e8; }
+
+        /* ============================================================
+           滑块：触屏友好
+           ============================================================ */
+        .slider-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 130px;
+            padding: 4px 0;
+        }
+        .slider-wrap input {
+            flex: 1;
+            height: 4px;
+            border-radius: 10px;
+            background: #c0d0e0;
+            -webkit-appearance: none;
+            appearance: none;
+            touch-action: none;         /* 让滑块独占触摸 */
+            cursor: pointer;
+            outline: none;
+        }
+        .slider-wrap input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #1a73e8;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+            cursor: grab;
+            transition: transform 0.1s;
+        }
+        .slider-wrap input::-webkit-slider-thumb:active { transform: scale(1.15); }
+        .slider-wrap input::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #1a73e8;
+            border: 2px solid white;
+            cursor: grab;
+        }
+        .slider-wrap input:disabled { opacity: 0.4; pointer-events: none; }
+
+        .slider-val {
+            min-width: 42px;
+            text-align: right;
+            font-weight: 600;
+            color: #1e3a5f;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        #hint-mini {
+            position: absolute;
+            right: max(18px, env(safe-area-inset-right));
+            color: #5a7188;
+            font-size: 11px;
+            background: rgba(255,255,255,0.6);
+            padding: 3px 12px;
+            border-radius: 30px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            pointer-events: none;
+            z-index: 150;
+            border: 0.5px solid rgba(255,255,255,0.6);
+            bottom: 90px; /* JS 动态调整 */
+        }
+
+        /* ============================================================
+           触屏设备（粗指针）: 加大所有可点击目标和滑块
+           ============================================================ */
+        @media (pointer: coarse) {
+            .ctrl-btn {
+                width: 38px;
+                height: 38px;
+                min-width: 38px;
+                min-height: 38px;
+                font-size: 20px;
+            }
+            .color-dot {
+                width: 34px;
+                height: 34px;
+                min-width: 34px;
+                min-height: 34px;
+            }
+            .reset-chip, .toggle-switch {
+                min-height: 34px;
+                padding: 7px 16px;
+                font-size: 13px;
+            }
+            .slider-wrap input {
+                height: 8px;
+            }
+            .slider-wrap input::-webkit-slider-thumb {
+                width: 24px;
+                height: 24px;
+            }
+            .slider-wrap input::-moz-range-thumb {
+                width: 24px;
+                height: 24px;
+            }
+            .slider-wrap {
+                min-width: 150px;
+                padding: 8px 0;
+            }
+            .bar-section {
+                min-height: 38px;
+            }
+        }
+
+        /* ============================================================
+           窄屏: 控制栏铺满宽度、自动换行、滑块独占行
+           ============================================================ */
+        @media (max-width: 800px) {
+            #control-bar {
+                width: calc(100vw - 16px);
+                padding: 8px 12px;
+                gap: 6px 10px;
+                border-radius: 18px;
+            }
+            .section-label { font-size: 11px; }
+            .ctrl-btn { width: 32px; height: 32px; font-size: 16px; }
+            .color-dot { width: 28px; height: 28px; }
+            .reset-chip, .toggle-switch { padding: 5px 10px; font-size: 11px; min-height: 28px; }
+            .slider-wrap { min-width: 110px; }
+
+            /* 两个滑块 section 独占一整行 */
+            .bar-section.slider-section {
+                flex: 1 1 100%;
+                justify-content: center;
+            }
+            .bar-section.slider-section .slider-wrap {
+                flex: 1 1 auto;
+                min-width: 120px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            #control-bar { padding: 6px 8px; gap: 5px 8px; }
+            .ctrl-btn { width: 28px; height: 28px; font-size: 15px; }
+            .color-dot { width: 24px; height: 24px; }
+            .reset-chip, .toggle-switch { padding: 4px 8px; font-size: 10px; min-height: 24px; }
+            .slider-wrap { min-width: 90px; }
+        }
+    </style>
+
+    </head>
+<body>
+    <div id="hint-mini">👆 单指旋转 · 双指平移/缩放</div>
+
+    <div id="control-bar">
+        <div class="bar-section">
+            <span class="section-label">堆积</span>
+            <button class="ctrl-btn" id="btn-dec" title="减少一层">−</button>
+            <span id="layer-num" class="layer-count-badge">3</span>
+            <button class="ctrl-btn" id="btn-inc" title="增加一层">+</button>
+        </div>
+
+        <div class="bar-section">
+            <span class="section-label">选色</span>
+            <div class="color-dots">
+                <div id="color-blue" class="color-dot active-dot" style="background: #3a86ff;" title="蓝色"></div>
+                <div id="color-green" class="color-dot" style="background: #2e9a6e;" title="绿色"></div>
+                <div id="color-red" class="color-dot" style="background: #e63946;" title="红色"></div>
+            </div>
+            <div id="reset-btn" class="reset-chip" title="重置所有层为蓝色">
+                <span>↻</span> 重置
+            </div>
+        </div>
+
+        <div class="bar-section">
+            <div id="toggle-cell" class="toggle-switch" title="显示晶胞">
+                <span>🔬</span> 晶胞
+            </div>
+        </div>
+
+        <div class="bar-section slider-section">
+            <span class="section-label">层间距</span>
+            <div class="slider-wrap">
+                <input type="range" id="layer-spacing-slider" min="1.0" max="2.4" step="0.01" value="1.0">
+                <span id="layer-spacing-display" class="slider-val">1.00</span>
+            </div>
+        </div>
+
+        <div class="bar-section slider-section">
+            <span class="section-label">球间距</span>
+            <div class="slider-wrap">
+                <input type="range" id="ball-spacing-slider" min="1.0" max="2.5" step="0.01" value="1.0">
+                <span id="ball-spacing-display" class="slider-val">1.00</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(7, 3.5, 6);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+
+        // --- 轨道控制（显式声明触摸手势） ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.set(0, 0, 0);
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        controls.update();
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+        const d1 = new THREE.DirectionalLight(0xffffff, 1.0);
+        d1.position.set(2, 5, 3);
+        scene.add(d1);
+
+        const d2 = new THREE.DirectionalLight(0xcce0ff, 0.8);
+        d2.position.set(-3, 2, -4);
+        scene.add(d2);
+
+        scene.add(new THREE.PointLight(0xaaccff, 0.5, 30, 1, 2, -3));
+        scene.add(new THREE.PointLight(0xffffff, 0.3, 30, -2, 1, 5));
+
+        // --- 全局变量 ---
+        const sphereRadius = 0.5;
+        let layerCount = 3;
+        let layersData = [];
+        const defaultColor = '#3a86ff';
+        let currentColor = defaultColor;
+        let showCell = false;
+
+        const layerGroup = new THREE.Group();
+        scene.add(layerGroup);
+
+        const numberGroup = new THREE.Group();
+        scene.add(numberGroup);
+
+        const cellGroup = new THREE.Group();
+        scene.add(cellGroup);
+
+        let allMeshes = [];
+        let meshIndexMap = new Map();
+
+        function getPositions(ballSpacing, type) {
+            if (type === 'A') {
+                const angles = [0, 60, 120, 180, 240, 300].map(d => d * Math.PI / 180);
+                const positions = [{x:0, z:0}];
+                angles.forEach(ang => positions.push({
+                    x: ballSpacing * Math.cos(ang),
+                    z: ballSpacing * Math.sin(ang)
+                }));
+                return positions;
+            } else {
+                const bRadius = ballSpacing / Math.sqrt(3);
+                const bAngles = [30, 150, 270].map(d => d * Math.PI / 180);
+                return bAngles.map(ang => ({
+                    x: bRadius * Math.cos(ang),
+                    z: bRadius * Math.sin(ang)
+                }));
+            }
+        }
+
+        function rebuildLayers() {
+            while (layerGroup.children.length) layerGroup.remove(layerGroup.children[0]);
+            while (numberGroup.children.length) numberGroup.remove(numberGroup.children[0]);
+            while (cellGroup.children.length) cellGroup.remove(cellGroup.children[0]);
+
+            allMeshes = [];
+            meshIndexMap.clear();
+
+            const layerSpacingFactor = parseFloat(document.getElementById('layer-spacing-slider').value);
+            const ballSpacing = parseFloat(document.getElementById('ball-spacing-slider').value);
+
+            const idealLayerOffset = Math.sqrt(2/3) * ballSpacing;
+            const layerSpacing = idealLayerOffset * layerSpacingFactor;
+            const baseY = -idealLayerOffset;
+
+            const newLayers = [];
+            let globalIndex = 1;
+
+            for (let i = 0; i < layerCount; i++) {
+                const yPos = baseY + i * layerSpacing;
+                let type;
+                if (i === 0) type = 'A';
+                else type = (i % 2 === 0) ? 'A' : 'B';
+
+                const positions = getPositions(ballSpacing, type);
+
+                let layerColor = currentColor;
+                if (layersData[i] && layersData[i].color) layerColor = layersData[i].color;
+
+                const meshes = [];
+                positions.forEach(pos => {
+                    const geometry = new THREE.SphereGeometry(sphereRadius, 48, 24);
+                    const material = new THREE.MeshStandardMaterial({
+                        color: layerColor,
+                        roughness: 0.28,
+                        metalness: 0.05
+                    });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(pos.x, yPos, pos.z);
+
+                    // 晶胞模式下只显示晶胞涉及的球
+                    const cellIndices = [1, 2, 3, 4, 8, 11, 12, 13, 14];
+                    mesh.visible = !showCell || cellIndices.includes(globalIndex);
+
+                    layerGroup.add(mesh);
+                    meshes.push(mesh);
+
+                    allMeshes.push(mesh);
+                    meshIndexMap.set(globalIndex, { mesh, pos: new THREE.Vector3(pos.x, yPos, pos.z) });
+
+                    globalIndex++;
+                });
+
+                newLayers.push({
+                    meshes,
+                    y: yPos,
+                    type,
+                    color: layerColor
+                });
+            }
+
+            layersData = newLayers;
+            document.getElementById('layer-num').textContent = layerCount;
+            document.getElementById('btn-dec').disabled = (layerCount <= 1);
+
+            if (showCell) drawCellBonds();
+        }
+
+        function drawCellBonds() {
+            const cellIndices = [1, 2, 3, 4, 8, 11, 12, 13, 14];
+            for (let idx of cellIndices) {
+                if (!meshIndexMap.has(idx)) return;
+            }
+
+            const getPos = (idx) => meshIndexMap.get(idx).pos;
+
+            const allConnections = [
+                [11, 1], [12, 2], [12, 11], [12, 13], [13, 3], [14, 4], [14, 11], [14, 13],
+                [2, 1], [2, 3], [4, 1], [4, 3],
+                [8, 1], [8, 2], [8, 3], [8, 4], [8, 11], [8, 12], [8, 13], [8, 14]
+            ];
+
+            // 过滤掉与球8相关的连接
+            const connections = allConnections.filter(([i, j]) => i !== 8 && j !== 8);
+
+            const addedEdges = new Set();
+
+            connections.forEach(([i, j]) => {
+                const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+                if (addedEdges.has(key)) return;
+                addedEdges.add(key);
+
+                if (!meshIndexMap.has(i) || !meshIndexMap.has(j)) return;
+
+                const p1 = getPos(i);
+                const p2 = getPos(j);
+
+                const start = p1.clone();
+                const end = p2.clone();
+                const direction = new THREE.Vector3().subVectors(end, start);
+                const length = direction.length();
+
+                const cylinderGeometry = new THREE.CylinderGeometry(0.04, 0.04, length, 6);
+                const cylinderMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7 });
+                const cylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+
+                const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                cylinder.position.copy(midPoint);
+
+                cylinder.quaternion.setFromUnitVectors(
+                    new THREE.Vector3(0, 1, 0),
+                    direction.clone().normalize()
+                );
+
+                cellGroup.add(cylinder);
+            });
+        }
+
+        function setLayerColor(index, hex) {
+            if (index >= 0 && index < layersData.length) {
+                layersData[index].color = hex;
+                layersData[index].meshes.forEach(m => m.material.color.set(hex));
+            }
+        }
+
+        function resetToBlue() {
+            currentColor = '#3a86ff';
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active-dot'));
+            document.getElementById('color-blue').classList.add('active-dot');
+            layersData.forEach((_, idx) => setLayerColor(idx, '#3a86ff'));
+
+            document.getElementById('layer-spacing-slider').value = '1.0';
+            document.getElementById('layer-spacing-display').textContent = '1.00';
+            document.getElementById('ball-spacing-slider').value = '1.0';
+            document.getElementById('ball-spacing-display').textContent = '1.00';
+            document.getElementById('ball-spacing-slider').disabled = false;
+
+            rebuildLayers();
+        }
+
+        // ============================================================
+        // 拾取：射线优先，触屏 45px 屏幕空间 fallback
+        // ============================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function doPick(clientX, clientY, pointerType) {
+            if (showCell) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const visibleMeshes = allMeshes.filter(m => m.visible);
+            const intersects = raycaster.intersectObjects(visibleMeshes);
+
+            let hitMesh = null;
+            if (intersects.length > 0) {
+                hitMesh = intersects[0].object;
+            } else if (pointerType !== 'mouse') {
+                // 触屏 fallback：屏幕空间 45px 内最近的球
+                const v = new THREE.Vector3();
+                let best = null, bestDist = 45;
+                visibleMeshes.forEach(mesh => {
+                    mesh.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = mesh; }
+                });
+                if (best) hitMesh = best;
+            }
+
+            if (!hitMesh) return;
+
+            for (let i = 0; i < layersData.length; i++) {
+                if (layersData[i].meshes.includes(hitMesh)) {
+                    layersData[i].meshes.forEach(m => m.material.color.set(currentColor));
+                    layersData[i].color = currentColor;
+                    break;
+                }
+            }
+        }
+
+        // ============================================================
+        // 触屏 / 鼠标 点击识别（三段式，避免拖拽旋转误着色）
+        // ============================================================
+        const activePointers = new Set();
+        let pointerDownInfo = null;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                pointerDownInfo = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch',
+                    id: e.pointerId
+                };
+            } else {
+                pointerDownInfo = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!pointerDownInfo || pointerDownInfo.id !== e.pointerId || activePointers.size !== 1) return;
+            const dx = e.clientX - pointerDownInfo.x;
+            const dy = e.clientY - pointerDownInfo.y;
+            const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+            if (dx * dx + dy * dy > thr * thr) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const countBeforeUp = activePointers.size;
+            if (pointerDownInfo && pointerDownInfo.id === e.pointerId && countBeforeUp === 1) {
+                const dx = e.clientX - pointerDownInfo.x;
+                const dy = e.clientY - pointerDownInfo.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = performance.now() - pointerDownInfo.t;
+                const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+                if (dist <= thr && dt <= 500) {
+                    doPick(e.clientX, e.clientY, pointerDownInfo.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            pointerDownInfo = null;
+        });
+
+        // iOS Safari 页面级双指缩放拦截
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        // 控制栏阻止事件冒泡到 canvas
+        const controlBar = document.getElementById('control-bar');
+        controlBar.addEventListener('pointerdown', (e) => e.stopPropagation());
+        controlBar.addEventListener('pointermove', (e) => e.stopPropagation());
+
+        // ============================================================
+        // 控制栏事件（全部只用 click，触屏无延迟）
+        // ============================================================
+        function initBar() {
+            const btnInc = document.getElementById('btn-inc');
+            const btnDec = document.getElementById('btn-dec');
+            const layerSlider = document.getElementById('layer-spacing-slider');
+            const layerDisplay = document.getElementById('layer-spacing-display');
+            const ballSlider = document.getElementById('ball-spacing-slider');
+            const ballDisplay = document.getElementById('ball-spacing-display');
+            const toggleCell = document.getElementById('toggle-cell');
+
+            ballSlider.disabled = false;
+
+            btnInc.addEventListener('click', () => {
+                if (layerCount < 10) { layerCount++; rebuildLayers(); }
+            });
+            btnDec.addEventListener('click', () => {
+                if (layerCount > 1) { layerCount--; rebuildLayers(); }
+            });
+
+            layerSlider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                layerDisplay.textContent = val.toFixed(2);
+                const isOne = Math.abs(val - 1.0) < 0.001;
+                ballSlider.disabled = !isOne;
+                if (!isOne) { ballSlider.value = '1.0'; ballDisplay.textContent = '1.00'; }
+                rebuildLayers();
+            });
+
+            ballSlider.addEventListener('input', (e) => {
+                ballDisplay.textContent = parseFloat(e.target.value).toFixed(2);
+                rebuildLayers();
+            });
+
+            toggleCell.addEventListener('click', () => {
+                showCell = !showCell;
+                toggleCell.classList.toggle('active', showCell);
+
+                if (showCell) {
+                    document.getElementById('layer-spacing-slider').value = '1.0';
+                    document.getElementById('layer-spacing-display').textContent = '1.00';
+                    document.getElementById('ball-spacing-slider').disabled = false;
+                }
+                rebuildLayers();
+            });
+
+            document.getElementById('color-blue').addEventListener('click', () => {
+                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active-dot'));
+                document.getElementById('color-blue').classList.add('active-dot');
+                currentColor = '#3a86ff';
+            });
+            document.getElementById('color-green').addEventListener('click', () => {
+                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active-dot'));
+                document.getElementById('color-green').classList.add('active-dot');
+                currentColor = '#2e9a6e';
+            });
+            document.getElementById('color-red').addEventListener('click', () => {
+                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active-dot'));
+                document.getElementById('color-red').classList.add('active-dot');
+                currentColor = '#e63946';
+            });
+            document.getElementById('reset-btn').addEventListener('click', resetToBlue);
+
+            rebuildLayers();
+        }
+
+        // ============================================================
+        // 相机自适应（横竖屏 / 窄屏）
+        // ============================================================
+        function updateCameraZoom() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const dist = camera.position.distanceTo(controls.target);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+            const baseVisibleH = 2 * dist * Math.tan(fovRad);
+            const baseVisibleW = baseVisibleH * aspect;
+
+            // 内容约 6.5 × 7（A 层直径 ≈ 2*球间距 + 球半径 + 10 层最高 + 斜投影 + 边距）
+            const contentW = 6.5;
+            const contentH = 7.0;
+
+            const zoomForW = baseVisibleW / contentW;
+            const zoomForH = baseVisibleH / contentH;
+
+            const isLandscape = aspect > 1;
+            const maxZoom = isLandscape ? 1.0 : 0.95;
+            const minZoom = isLandscape ? 0.45 : 0.28;
+
+            camera.zoom = Math.max(minZoom, Math.min(maxZoom, zoomForW, zoomForH));
+            camera.updateProjectionMatrix();
+        }
+        updateCameraZoom();
+
+        // 提示条动态避让控制栏
+        function updateHintPosition() {
+            const barRect = controlBar.getBoundingClientRect();
+            const hint = document.getElementById('hint-mini');
+            if (!hint) return;
+            const offsetFromBottom = window.innerHeight - barRect.top + 12;
+            hint.style.bottom = offsetFromBottom + 'px';
+        }
+        updateHintPosition();
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+
+        // --- 窗口 / 屏幕变化 ---
+        let resizeTimer = null;
+        function onWindowResize() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                labelRenderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                updateCameraZoom();
+                updateHintPosition();
+            }, 60);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onWindowResize, 300);
+        });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onWindowResize);
+        }
+
+        initBar();
+        animate();
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C60 足球烯 - 黑球放大版 | 白背景 无旋转</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* 移除所有文本框 */
+        .info, .note, .instruction {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 所有文本框已移除（通过CSS隐藏） -->
+    <!-- 注意：坐标轴的XYZ标签未在C60模型中使用，无需处理 -->
+
+    <!-- 使用 import map 指定 Three.js 和扩展库 -->
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 (白色背景) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // --- 相机 ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(16, 6, 20);
+        camera.lookAt(0, 0, 0);
+
+        // --- 渲染器 ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // --- 轨道控制器 (无自动旋转) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.rotateSpeed = 1.2;
+        controls.target.set(0, 0, 0);
+        controls.maxPolarAngle = Math.PI;
+
+        // --- 光源: 保证黑色球体在白色背景下有良好立体感 ---
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.3);
+        dirLight1.position.set(8, 12, 15);
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0xffeedd, 0.9);
+        dirLight2.position.set(-10, -5, -12);
+        scene.add(dirLight2);
+
+        const pointLight1 = new THREE.PointLight(0xaaccff, 0.7);
+        pointLight1.position.set(-8, 6, -12);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xccddff, 0.5);
+        pointLight2.position.set(0, 18, 5);
+        scene.add(pointLight2);
+
+        const bottomLight = new THREE.PointLight(0x99aacc, 0.3);
+        bottomLight.position.set(0, -10, 5);
+        scene.add(bottomLight);
+
+        // ========== 生成 C60 坐标 (与之前相同，保证60顶点) ==========
+        const phi = (1 + Math.sqrt(5)) / 2;
+        
+        const icoCoords = [
+            [0, 1, phi], [0, 1, -phi], [0, -1, phi], [0, -1, -phi],
+            [1, phi, 0], [1, -phi, 0], [-1, phi, 0], [-1, -phi, 0],
+            [phi, 0, 1], [phi, 0, -1], [-phi, 0, 1], [-phi, 0, -1]
+        ];
+        
+        const normFactor = 1 / Math.sqrt(1 + phi * phi);
+        const icoVertices = icoCoords.map(c => new THREE.Vector3(c[0] * normFactor, c[1] * normFactor, c[2] * normFactor));
+
+        const icoEdges = [];
+        const expectedEdgeDist = 1.05146;
+        const tolerance = 0.01;
+        
+        for (let i = 0; i < icoVertices.length; i++) {
+            for (let j = i + 1; j < icoVertices.length; j++) {
+                const dist = icoVertices[i].distanceTo(icoVertices[j]);
+                if (Math.abs(dist - expectedEdgeDist) < tolerance) {
+                    icoEdges.push([i, j]);
+                }
+            }
+        }
+
+        const rawPoints = [];
+        icoEdges.forEach(edge => {
+            const v1 = icoVertices[edge[0]];
+            const v2 = icoVertices[edge[1]];
+            const p1 = new THREE.Vector3().lerpVectors(v1, v2, 1/3);
+            const p2 = new THREE.Vector3().lerpVectors(v1, v2, 2/3);
+            rawPoints.push(p1.normalize());
+            rawPoints.push(p2.normalize());
+        });
+
+        const toleranceDist = 0.001;
+        const uniquePoints = [];
+        rawPoints.forEach(p => {
+            let exists = false;
+            for (let up of uniquePoints) {
+                if (up.distanceTo(p) < toleranceDist) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                uniquePoints.push(p.clone());
+            }
+        });
+
+        const modelScale = 7.8;
+        const atomPositions = uniquePoints.map(p => p.clone().normalize().multiplyScalar(modelScale));
+
+        // ========== 构建碳原子 ==========
+        // 原子颜色: 纯黑 (0x111111 接近纯黑但保留高光细节)
+        // 修改点: 原子半径从 0.6 增大到 0.85 (同时微调键的半径和模型比例以保持视觉协调)
+        const atomMaterial = new THREE.MeshStandardMaterial({
+            color: 0x111111,
+            emissive: 0x000000,
+            roughness: 0.4,
+            metalness: 0.3,
+            emissiveIntensity: 0.0
+        });
+        
+        const atomRadius = 0.85;         // 显著增大 (原来0.6)
+        const atomGroup = new THREE.Group();
+        
+        atomPositions.forEach(pos => {
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(atomRadius, 48, 32), atomMaterial); // 分段数增加使球更圆润
+            sphere.position.copy(pos);
+            atomGroup.add(sphere);
+        });
+        
+        scene.add(atomGroup);
+
+        // ========== 构建化学键 ==========
+        // 由于原子变大，稍微将键的半径减小一点，避免视觉上键被完全遮挡，同时保持灰黑色
+        let minDist = Infinity;
+        for (let i = 0; i < atomPositions.length; i++) {
+            for (let j = i + 1; j < atomPositions.length; j++) {
+                const dist = atomPositions[i].distanceTo(atomPositions[j]);
+                if (dist < minDist) minDist = dist;
+            }
+        }
+        
+        const threshold = minDist * 1.08;
+        const bondPairs = [];
+        
+        for (let i = 0; i < atomPositions.length; i++) {
+            for (let j = i + 1; j < atomPositions.length; j++) {
+                const dist = atomPositions[i].distanceTo(atomPositions[j]);
+                if (dist < threshold) {
+                    bondPairs.push([i, j]);
+                }
+            }
+        }
+        
+        const bondMaterial = new THREE.MeshStandardMaterial({
+            color: 0x666666,
+            emissive: 0x111111,
+            roughness: 0.5,
+            metalness: 0.2
+        });
+        
+        const bondRadius = 0.13;          // 稍微调细一点 (原来0.15)，让原子更突出
+        const bondGroup = new THREE.Group();
+        
+        bondPairs.forEach(pair => {
+            const p1 = atomPositions[pair[0]];
+            const p2 = atomPositions[pair[1]];
+            
+            const start = p1.clone();
+            const end = p2.clone();
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            
+            const cylinder = new THREE.Mesh(
+                new THREE.CylinderGeometry(bondRadius, bondRadius, length, 8),
+                bondMaterial
+            );
+            
+            const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            cylinder.position.copy(mid);
+            
+            cylinder.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                direction.clone().normalize()
+            );
+            
+            bondGroup.add(cylinder);
+        });
+        
+        scene.add(bondGroup);
+
+        // ========== 动画循环 ==========
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+            
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // ========== 窗口自适应 ==========
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        console.log('C60 黑球放大版 (半径0.85) 已加载');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

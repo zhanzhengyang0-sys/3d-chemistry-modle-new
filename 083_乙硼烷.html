@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+    <title>乙硼烷 B₂H₆ · 3D 球棍模型</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #ffffff;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #legend {
+            position: absolute;
+            bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            padding: 5px 14px;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            font-size: 11px;
+            color: #444;
+            z-index: 100;
+            display: flex;
+            gap: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        #controls-bar {
+            position: absolute;
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            padding: 4px 14px;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #ddd;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 28px;
+            font-size: 12px;
+            color: #333;
+            touch-action: none;
+            pointer-events: auto;
+        }
+        #controls-bar input {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: #e67e22;
+            cursor: pointer;
+        }
+        #controls-bar label {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        @media (max-width: 480px) {
+            #legend { font-size: 10px; padding: 4px 12px; gap: 10px; }
+            .legend-dot { width: 9px; height: 9px; }
+            #controls-bar { height: 26px; font-size: 11px; padding: 3px 12px; }
+            #controls-bar input { width: 13px; height: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#e67e22;"></div>B</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2980b9;"></div>H</div>
+    </div>
+
+    <div id="controls-bar">
+        <input type="checkbox" id="planeToggle" checked>
+        <label for="planeToggle">显示平面</label>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        // --- 控制器（触屏适配 + 角度更大）---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+
+        // 放开角度限制，全方位拖拽
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+        controls.minAzimuthAngle = -Infinity;
+        controls.maxAzimuthAngle = Infinity;
+
+        // 拖拽灵敏度调大
+        controls.rotateSpeed = 1.5;
+        controls.zoomSpeed = 1.0;
+        controls.panSpeed = 1.0;
+
+        controls.target.set(0, 0, 0);
+
+        // 根据屏幕方向设置相机距离，保证模型完整可见
+        function fitCameraToScreen() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const aspect = w / h;
+
+            let dist;
+            if (aspect < 1) {
+                // 竖屏
+                dist = 7.0;
+            } else if (aspect < 1.6) {
+                // 近方形
+                dist = 6.3;
+            } else {
+                // 横屏
+                dist = 5.7;
+            }
+
+            const dir = new THREE.Vector3(5, 3.5, 6).normalize();
+            camera.position.copy(dir.multiplyScalar(dist));
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            controls.update();
+        }
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        const d1 = new THREE.DirectionalLight(0xffffff, 0.9);
+        d1.position.set(5, 8, 6);
+        scene.add(d1);
+        const d2 = new THREE.DirectionalLight(0xccddff, 0.5);
+        d2.position.set(-5, -3, -6);
+        scene.add(d2);
+        const d3 = new THREE.DirectionalLight(0xffeecc, 0.4);
+        d3.position.set(2, -6, 4);
+        scene.add(d3);
+
+        // --- 材质 ---
+        const bMat    = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.3, metalness: 0.1 });
+        const hMat    = new THREE.MeshStandardMaterial({ color: 0x2980b9, roughness: 0.4, metalness: 0.05 });
+        const bondMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.6, metalness: 0.0, transparent: true, opacity: 0.98 });
+
+        const bridgePlaneMat = new THREE.MeshStandardMaterial({
+            color: 0x27ae60,
+            transparent: true,
+            opacity: 0.18,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            roughness: 0.9,
+            metalness: 0.0
+        });
+        const termPlaneMat = new THREE.MeshStandardMaterial({
+            color: 0x8e44ad,
+            transparent: true,
+            opacity: 0.18,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            roughness: 0.9,
+            metalness: 0.0
+        });
+
+        // --- 分组 ---
+        const rootGroup = new THREE.Group();
+        scene.add(rootGroup);
+
+        const atomGroup    = new THREE.Group();
+        const bondGroup    = new THREE.Group();
+        const planeGroup   = new THREE.Group();
+        rootGroup.add(atomGroup);
+        rootGroup.add(bondGroup);
+        rootGroup.add(planeGroup);
+
+        // --- 辅助函数 ---
+        function addSphere(pos, radius, material) {
+            const m = new THREE.Mesh(new THREE.SphereGeometry(radius, 28, 18), material);
+            m.position.copy(pos);
+            atomGroup.add(m);
+            return m;
+        }
+
+        function makeBond(start, end, radius, material) {
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            if (len < 0.001) return null;
+            const cyl = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 10), material);
+            cyl.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            bondGroup.add(cyl);
+            return cyl;
+        }
+
+        // ============================================================
+        // B₂H₆ 几何布局
+        // ============================================================
+
+        const bRadius    = 0.39;
+        const hRadius    = 0.234;
+        const bondRadius = 0.05;
+
+        const h  = 0.90;
+        const w  = 0.85;
+        const y1 = h + 0.75;
+        const z1 = 0.92;
+
+        const b1 = new THREE.Vector3(0,  h, 0);
+        const b2 = new THREE.Vector3(0, -h, 0);
+
+        const hB1 = new THREE.Vector3( w, 0, 0);
+        const hB2 = new THREE.Vector3(-w, 0, 0);
+
+        const hT1a = new THREE.Vector3(0,  y1,  z1);
+        const hT1b = new THREE.Vector3(0,  y1, -z1);
+        const hT2a = new THREE.Vector3(0, -y1,  z1);
+        const hT2b = new THREE.Vector3(0, -y1, -z1);
+
+        addSphere(b1, bRadius, bMat);
+        addSphere(b2, bRadius, bMat);
+
+        addSphere(hB1, hRadius, hMat);
+        addSphere(hB2, hRadius, hMat);
+
+        addSphere(hT1a, hRadius, hMat);
+        addSphere(hT1b, hRadius, hMat);
+        addSphere(hT2a, hRadius, hMat);
+        addSphere(hT2b, hRadius, hMat);
+
+        makeBond(b1, hB1, bondRadius, bondMat);
+        makeBond(b1, hB2, bondRadius, bondMat);
+        makeBond(b2, hB1, bondRadius, bondMat);
+        makeBond(b2, hB2, bondRadius, bondMat);
+
+        makeBond(b1, hT1a, bondRadius, bondMat);
+        makeBond(b1, hT1b, bondRadius, bondMat);
+
+        makeBond(b2, hT2a, bondRadius, bondMat);
+        makeBond(b2, hT2b, bondRadius, bondMat);
+
+        // ============================================================
+        // 两个半透明矩形面
+        // ============================================================
+
+        const bridgePlaneGeo = new THREE.PlaneGeometry(2 * w, 3.7 * h);
+        const bridgePlane = new THREE.Mesh(bridgePlaneGeo, bridgePlaneMat);
+        bridgePlane.position.set(0, 0, 0);
+        planeGroup.add(bridgePlane);
+
+        const termPlaneGeo = new THREE.PlaneGeometry(2 * z1, 2 * y1);
+        const termPlane = new THREE.Mesh(termPlaneGeo, termPlaneMat);
+        termPlane.position.set(0, 0, 0);
+        termPlane.rotation.y = Math.PI / 2;
+        planeGroup.add(termPlane);
+
+        // ============================================================
+        // 初始姿态
+        //   1) 先绕局部 y 轴（B–B 轴）转 90° —— 带着平面一起转
+        //   2) 再做原来的三次旋转
+        // ============================================================
+        rootGroup.rotateY(Math.PI / 2);
+        rootGroup.rotateX(Math.PI / 2);
+        rootGroup.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+        rootGroup.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 12);
+
+        // ============================================================
+        // 控制面板
+        // ============================================================
+        const planeToggle = document.getElementById('planeToggle');
+        planeToggle.addEventListener('change', (e) => {
+            planeGroup.visible = e.target.checked;
+        });
+
+        // --- 初始相机适配 ---
+        fitCameraToScreen();
+
+        // --- 动画 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 窗口 / 屏幕方向自适应 ---
+        function onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            fitCameraToScreen();
+        }
+
+        window.addEventListener('resize', onResize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onResize, 200);
+        });
+
+        // 阻止 iOS 双指缩放页面，避免和 OrbitControls 冲突
+        document.addEventListener('gesturestart', (e) => e.preventDefault());
+        document.addEventListener('gesturechange', (e) => e.preventDefault());
+        document.addEventListener('gestureend', (e) => e.preventDefault());
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

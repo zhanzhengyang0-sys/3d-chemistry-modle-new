@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>氨硼烷 (NH₃BH₃) - 白底灰键不透明 - 点击切换 H/Cl</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #ffffff; }
+
+        #controls-panel {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #333;
+            font-family: 'Arial', sans-serif;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border-radius: 40px;
+            border: 1px solid #dddddd;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            z-index: 200;
+            pointer-events: all;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            padding: 8px 24px;
+        }
+        #controls-panel label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: #555;
+            font-weight: 500;
+        }
+        #controls-panel input[type="range"] {
+            width: 280px;
+            cursor: pointer;
+            background: #e0e0e0;
+            height: 4px;
+            border-radius: 4px;
+            -webkit-appearance: none;
+            outline: none;
+        }
+        #controls-panel input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #88bbff;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+        #angle-value {
+            min-width: 60px;
+            text-align: center;
+            color: #88bbff;
+            font-weight: bold;
+            font-size: 14px;
+            background: #f5f5f5;
+            padding: 3px 12px;
+            border-radius: 30px;
+            border: 1px solid #dddddd;
+        }
+        .panel-hint {
+            font-size: 12px;
+            color: #ff8844;
+            background: rgba(255, 242, 230, 0.9);
+            padding: 4px 12px;
+            border-radius: 30px;
+            border-left: 2px solid #ffaa66;
+            margin-left: 8px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+        #click-hint {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #ff8844;
+            font-family: monospace;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 5px 14px;
+            border-radius: 40px;
+            border: 1px solid #ffaa66;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+            font-weight: 500;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        }
+        @media (max-width: 700px) {
+            #controls-panel {
+                gap: 12px;
+                padding: 6px 18px;
+                bottom: 18px;
+                width: auto;
+                max-width: 90%;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            #controls-panel input[type="range"] {
+                width: 200px;
+            }
+            .panel-hint {
+                font-size: 10px;
+                padding: 3px 10px;
+            }
+            #click-hint {
+                top: 12px;
+                right: 12px;
+                font-size: 10px;
+                padding: 4px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="click-hint">🖱️ 点击原子切换 H ⇄ Cl</div>
+
+    <div id="controls-panel">
+        <label>
+            <span style="color:#555;">↻ 旋转 BH₃ 基团</span>
+            <input type="range" id="rotate-slider" min="0" max="360" step="0.1" value="60">
+        </label>
+        <span id="angle-value">60.0°</span>
+        <span class="panel-hint">⚡ 氯原子取代后位置与旋转行为完全相同</span>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 (白色背景) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+        scene.fog = null;
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const bondCenter = new THREE.Vector3(0, 0, 0.85);
+        camera.position.set(5, 3, 8);
+        camera.lookAt(bondCenter);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(bondCenter);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.autoRotate = false;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+
+        // --- 光照 ---
+        const ambientLight = new THREE.AmbientLight(0x888888);
+        scene.add(ambientLight);
+
+        const light1 = new THREE.PointLight(0xffffff, 1.4);
+        light1.position.set(6, 8, 6);
+        scene.add(light1);
+
+        const light2 = new THREE.PointLight(0xffffff, 1.2);
+        light2.position.set(-5, 4, 7);
+        scene.add(light2);
+
+        const light3 = new THREE.DirectionalLight(0xffffff, 0.8);
+        light3.position.set(-3, 2, -5);
+        scene.add(light3);
+
+        const light4 = new THREE.PointLight(0xffffff, 1.0);
+        light4.position.set(4, -3, 6);
+        scene.add(light4);
+
+        const light5 = new THREE.PointLight(0xffffff, 0.9);
+        light5.position.set(0, 5, -5);
+        scene.add(light5);
+
+        // --- 原子半径和颜色 ---
+        const rN  = 0.45;   // N 稍小
+        const rB  = 0.50;   // B 和碳接近
+        const rH  = 0.30;
+        const rCl = 0.60;
+
+        // 氮：深蓝紫
+        const nitrogenMat = new THREE.MeshStandardMaterial({
+            color: 0x8e44ad,
+            roughness: 0.2,
+            metalness: 0.05
+        });
+
+        // 硼：橙红
+        const boronMat = new THREE.MeshStandardMaterial({
+            color: 0xe67e22,
+            roughness: 0.2,
+            metalness: 0.05
+        });
+
+        // 氢：深蓝
+        const hMat = new THREE.MeshStandardMaterial({
+            color: 0x3366cc,
+            roughness: 0.2,
+            metalness: 0.0
+        });
+
+        // 氯：亮绿
+        const clMat = new THREE.MeshStandardMaterial({
+            color: 0x44dd88,
+            roughness: 0.2,
+            metalness: 0.0
+        });
+
+        // 灰色不透明键
+        const bondMat = new THREE.MeshStandardMaterial({
+            color: 0x888888,
+            roughness: 0.3,
+            metalness: 0.0,
+            transparent: false
+        });
+
+        const clBondMat = new THREE.MeshStandardMaterial({
+            color: 0x888888,
+            roughness: 0.3,
+            metalness: 0.0,
+            transparent: false
+        });
+
+        // --- 构建氨硼烷 NH₃BH₃ ---
+        // N–B 键长 ≈ 1.58 Å → 缩放 1.7（和乙烷 C–C 一致，便于复用）
+        const bondLength = 1.7;
+        const nPos = new THREE.Vector3(0, 0, 0);
+        const bPos = new THREE.Vector3(0, 0, 1.7);
+
+        // N 原子
+        const nitrogen = new THREE.Mesh(new THREE.SphereGeometry(rN, 64, 32), nitrogenMat);
+        nitrogen.position.copy(nPos);
+        scene.add(nitrogen);
+
+        // B 原子
+        const boron = new THREE.Mesh(new THREE.SphereGeometry(rB, 64, 32), boronMat);
+        boron.position.copy(bPos);
+        scene.add(boron);
+
+        // N→B 配位键（画一根灰色圆柱）
+        const nbBondGeo = new THREE.CylinderGeometry(0.1, 0.1, bondLength, 12);
+        const nbBond = new THREE.Mesh(nbBondGeo, bondMat);
+        nbBond.position.set(0, 0, 0.85);
+        nbBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+        scene.add(nbBond);
+
+        // --- 左侧 NH₃ 基团 (固定) ---
+        const nhLength = 1.5;
+        const cosTetN = -1/3;   // 指向 N 的方向
+        const sinTetN = Math.sqrt(1 - cosTetN * cosTetN);
+
+        const anglesN = [0, 120, 240].map(deg => deg * Math.PI / 180);
+
+        const clickableAtoms = [];
+
+        anglesN.forEach(phi => {
+            const x = sinTetN * Math.cos(phi) * nhLength;
+            const y = sinTetN * Math.sin(phi) * nhLength;
+            const z = cosTetN * nhLength;
+            const hPos = new THREE.Vector3(x, y, z);
+
+            const hydrogen = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 24), hMat);
+            hydrogen.position.copy(hPos);
+
+            hydrogen.userData = {
+                type: 'H',
+                side: 'left',
+                bond: null,
+                relPos: hPos.clone(),
+                cPos: nPos.clone()
+            };
+
+            scene.add(hydrogen);
+            clickableAtoms.push(hydrogen);
+
+            // N–H 键
+            const start = nPos;
+            const end = hPos.clone();
+            const dir = end.clone().sub(start);
+            const len = dir.length();
+            const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, len, 12), bondMat);
+            cylinder.position.copy(start.clone().add(end).multiplyScalar(0.5));
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+
+            hydrogen.userData.bond = cylinder;
+            scene.add(cylinder);
+        });
+
+        // --- 右侧 BH₃ 基团 (可旋转) ---
+        const rightGroup = new THREE.Group();
+        rightGroup.position.copy(bPos);
+
+        const cosTetB = 1/3;    // 指向远离 B 的方向
+        const sinTetB = Math.sqrt(1 - cosTetB * cosTetB);
+
+        const anglesB = [0, 120, 240].map(deg => deg * Math.PI / 180);
+
+        anglesB.forEach((phi) => {
+            const x = sinTetB * Math.cos(phi) * nhLength;
+            const y = sinTetB * Math.sin(phi) * nhLength;
+            const z = cosTetB * nhLength;
+            const hRelPos = new THREE.Vector3(x, y, z);
+
+            const hydrogen = new THREE.Mesh(new THREE.SphereGeometry(rH, 48, 24), hMat);
+            hydrogen.position.copy(hRelPos);
+
+            hydrogen.userData = {
+                type: 'H',
+                side: 'right',
+                bond: null,
+                relPos: hRelPos.clone(),
+                cPos: bPos.clone()
+            };
+
+            const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, nhLength, 12), bondMat);
+            const midPos = hRelPos.clone().multiplyScalar(0.5);
+            cylinder.position.copy(midPos);
+            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), hRelPos.clone().normalize());
+
+            hydrogen.userData.bond = cylinder;
+
+            rightGroup.add(hydrogen);
+            rightGroup.add(cylinder);
+        });
+
+        scene.add(rightGroup);
+
+        // 将右侧氢原子加入可点击数组
+        rightGroup.children.forEach(child => {
+            if (child.isMesh && child.material === hMat) {
+                clickableAtoms.push(child);
+            }
+        });
+
+        // 初始角度
+        const initialDeg = 60;
+        rightGroup.rotation.z = initialDeg * Math.PI / 180;
+
+        // --- 滑块交互 ---
+        const slider = document.getElementById('rotate-slider');
+        const angleDisplay = document.getElementById('angle-value');
+
+        slider.value = initialDeg;
+        angleDisplay.textContent = initialDeg.toFixed(1) + '°';
+
+        slider.addEventListener('input', (e) => {
+            const deg = parseFloat(e.target.value);
+            angleDisplay.textContent = deg.toFixed(1) + '°';
+            rightGroup.rotation.z = deg * Math.PI / 180;
+        });
+
+        // --- 射线检测器 ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        renderer.domElement.addEventListener('click', onClick, false);
+
+        function onClick(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(clickableAtoms);
+
+            if (intersects.length > 0) {
+                const hitAtom = intersects[0].object;
+
+                if (hitAtom.userData.type === 'H') {
+                    replaceHydrogenWithChlorine(hitAtom);
+                } else if (hitAtom.userData.type === 'Cl') {
+                    replaceChlorineWithHydrogen(hitAtom);
+                }
+            }
+        }
+
+        // 替换: H -> Cl
+        function replaceHydrogenWithChlorine(hydrogen) {
+            const side = hydrogen.userData.side;
+            const relPos = hydrogen.userData.relPos.clone();
+            const cPos = hydrogen.userData.cPos.clone();
+            const oldBond = hydrogen.userData.bond;
+
+            scene.remove(hydrogen);
+            if (oldBond) scene.remove(oldBond);
+
+            if (side === 'right') {
+                rightGroup.remove(hydrogen);
+                if (oldBond) rightGroup.remove(oldBond);
+            }
+
+            const index = clickableAtoms.indexOf(hydrogen);
+            if (index > -1) clickableAtoms.splice(index, 1);
+
+            const chlorineGeo = new THREE.SphereGeometry(rCl, 64, 32);
+            const chlorine = new THREE.Mesh(chlorineGeo, clMat);
+
+            const dir = relPos.clone().normalize();
+            const len = relPos.length();
+
+            const cylinderGeo = new THREE.CylinderGeometry(0.08, 0.08, len, 12);
+            const newBond = new THREE.Mesh(cylinderGeo, clBondMat);
+            const midPos = relPos.clone().multiplyScalar(0.5);
+            newBond.position.copy(midPos);
+            newBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone());
+
+            chlorine.userData = {
+                type: 'Cl',
+                side: side,
+                bond: newBond,
+                relPos: relPos.clone(),
+                cPos: cPos.clone()
+            };
+
+            if (side === 'left') {
+                chlorine.position.copy(relPos);
+                scene.add(chlorine);
+                scene.add(newBond);
+            } else {
+                chlorine.position.copy(relPos);
+                rightGroup.add(chlorine);
+                rightGroup.add(newBond);
+            }
+
+            clickableAtoms.push(chlorine);
+        }
+
+        // 替换: Cl -> H
+        function replaceChlorineWithHydrogen(chlorine) {
+            const side = chlorine.userData.side;
+            const relPos = chlorine.userData.relPos.clone();
+            const cPos = chlorine.userData.cPos.clone();
+            const oldBond = chlorine.userData.bond;
+
+            scene.remove(chlorine);
+            if (oldBond) scene.remove(oldBond);
+
+            if (side === 'right') {
+                rightGroup.remove(chlorine);
+                if (oldBond) rightGroup.remove(oldBond);
+            }
+
+            const index = clickableAtoms.indexOf(chlorine);
+            if (index > -1) clickableAtoms.splice(index, 1);
+
+            const hydrogenGeo = new THREE.SphereGeometry(rH, 48, 24);
+            const hydrogen = new THREE.Mesh(hydrogenGeo, hMat);
+
+            const dir = relPos.clone().normalize();
+            const len = relPos.length();
+
+            const cylinderGeo = new THREE.CylinderGeometry(0.08, 0.08, len, 12);
+            const newBond = new THREE.Mesh(cylinderGeo, bondMat);
+            const midPos = relPos.clone().multiplyScalar(0.5);
+            newBond.position.copy(midPos);
+            newBond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone());
+
+            hydrogen.userData = {
+                type: 'H',
+                side: side,
+                bond: newBond,
+                relPos: relPos.clone(),
+                cPos: cPos.clone()
+            };
+
+            if (side === 'left') {
+                hydrogen.position.copy(relPos);
+                scene.add(hydrogen);
+                scene.add(newBond);
+            } else {
+                hydrogen.position.copy(relPos);
+                rightGroup.add(hydrogen);
+                rightGroup.add(newBond);
+            }
+
+            clickableAtoms.push(hydrogen);
+        }
+
+        // --- 渲染循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

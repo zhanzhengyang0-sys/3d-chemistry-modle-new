@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>暗深蓝色立体结构 - 点击切换显隐</title>
+    <style>
+        * { margin: 0; padding: 0; }
+        body { background: white; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
+        #container { width: 100vw; height: 100vh; position: relative; }
+        
+        .controls-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(25, 30, 38, 0.88);
+            backdrop-filter: blur(10px);
+            padding: 6px 18px;
+            border-radius: 28px;
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+            font-family: 'Segoe UI', sans-serif;
+            border: 1px solid rgba(120, 140, 170, 0.5);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            pointer-events: auto;
+            flex-wrap: nowrap;
+            justify-content: center;
+            white-space: nowrap;
+        }
+        
+        .switch {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #eef2f8;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .switch input {
+            width: 32px;
+            height: 16px;
+            appearance: none;
+            background: #3a404a;
+            border-radius: 16px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            margin: 0;
+        }
+        
+        .switch input:checked {
+            background: #2c6e9e;
+        }
+        
+        .switch input::before {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s ease;
+        }
+        
+        .switch input:checked::before {
+            transform: translateX(16px);
+        }
+        
+        .switch span {
+            font-size: 11px;
+            letter-spacing: 0.2px;
+            font-weight: 500;
+        }
+        
+        @media (max-width: 700px) {
+            .controls-panel { gap: 12px; padding: 5px 12px; border-radius: 24px; }
+            .switch { gap: 5px; }
+            .switch input { width: 28px; height: 14px; }
+            .switch input::before { width: 10px; height: 10px; top: 2px; left: 2px; }
+            .switch input:checked::before { transform: translateX(14px); }
+            .switch span { font-size: 9px; }
+        }
+        
+        /* 点击提示 */
+        .click-hint {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: #ffd966;
+            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            pointer-events: none;
+            z-index: 99;
+            font-family: monospace;
+            white-space: nowrap;
+            backdrop-filter: blur(4px);
+        }
+        
+        @media (max-width: 700px) {
+            .click-hint { bottom: 65px; font-size: 9px; padding: 3px 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div class="controls-panel">
+        <div class="switch"><input type="checkbox" id="toggleSphere" checked><label for="toggleSphere"><span>体心球</span></label></div>
+        <div class="switch"><input type="checkbox" id="toggleCubeEdges" checked><label for="toggleCubeEdges"><span>立方体边框</span></label></div>
+    </div>
+    <div class="click-hint">💡 点击面心球 / 棱心球 / 角球 可切换显隐</div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+        
+        const container = document.getElementById('container');
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(28, 18, 32);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0xffffff);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+        
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        container.appendChild(labelRenderer.domElement);
+
+        // 光照
+        const ambientLight = new THREE.AmbientLight(0x7a9abb, 0.7);
+        scene.add(ambientLight);
+        const mainLight = new THREE.DirectionalLight(0xfff0e0, 1.4);
+        mainLight.position.set(10, 15, 8);
+        scene.add(mainLight);
+        const backLight = new THREE.DirectionalLight(0xcceeff, 0.8);
+        backLight.position.set(-7, 6, -12);
+        scene.add(backLight);
+        const fillLight1 = new THREE.PointLight(0x88aacc, 0.5);
+        fillLight1.position.set(6, 4, 7);
+        scene.add(fillLight1);
+        const fillLight2 = new THREE.PointLight(0xccaa88, 0.45);
+        fillLight2.position.set(-5, 7, 6);
+        scene.add(fillLight2);
+        const bottomFill = new THREE.PointLight(0x88aacc, 0.45);
+        bottomFill.position.set(0, -9, 0);
+        scene.add(bottomFill);
+        const rimLight = new THREE.PointLight(0xffbb99, 0.5);
+        rimLight.position.set(-4, 8, -10);
+        scene.add(rimLight);
+
+        const uniformColor = 0x2c5f8a;
+        
+        // 参数
+        const scaleFactor = 3.2;
+        const sphereRadius = 1.25 * scaleFactor;
+        const newRadius = sphereRadius * 2;
+        const ratio = newRadius / (1.5 * scaleFactor);
+        const yOffset = 0.8 * scaleFactor * ratio;
+        const bottomY = -2.2 * scaleFactor * ratio;
+        const verticalShift = 90.0;
+        const sphereCenter = new THREE.Vector3(0, bottomY + verticalShift, 0);
+        const mirrorY = sphereCenter.y;
+        const half = newRadius;
+        
+        const vertices = [
+            new THREE.Vector3( half,  half + yOffset + verticalShift,  half),  // 0
+            new THREE.Vector3(-half,  half + yOffset + verticalShift,  half),  // 1
+            new THREE.Vector3(-half, -half + yOffset + verticalShift,  half),  // 2
+            new THREE.Vector3( half, -half + yOffset + verticalShift,  half),  // 3
+            new THREE.Vector3( half,  half + yOffset + verticalShift, -half),  // 4
+            new THREE.Vector3(-half,  half + yOffset + verticalShift, -half),  // 5
+            new THREE.Vector3(-half, -half + yOffset + verticalShift, -half),  // 6
+            new THREE.Vector3( half, -half + yOffset + verticalShift, -half)   // 7
+        ];
+
+        function mirrorAboutPlane(point) {
+            return new THREE.Vector3(point.x, 2 * mirrorY - point.y, point.z);
+        }
+
+        function createMatteMaterial(color, opacity = 1.0) {
+            return new THREE.MeshStandardMaterial({ 
+                color, 
+                roughness: 0.65, 
+                metalness: 0.02, 
+                side: THREE.DoubleSide, 
+                emissive: 0x000000,
+                transparent: opacity < 1.0,
+                opacity: opacity
+            });
+        }
+
+        function createOctant(pos, rot, color) {
+            const geom = new THREE.SphereGeometry(sphereRadius, 80, 80, 0, Math.PI/2, 0, Math.PI/2);
+            const mesh = new THREE.Mesh(geom, createMatteMaterial(color));
+            mesh.position.set(pos[0], pos[1], pos[2]);
+            mesh.rotation.set(rot[0], rot[1], rot[2]);
+            return mesh;
+        }
+
+        function createFace(center, c1, c2, color) {
+            const dir1 = new THREE.Vector3().subVectors(c1, center).normalize();
+            const dir2 = new THREE.Vector3().subVectors(c2, center).normalize();
+            const segments = 32;
+            const adjCenter = center.clone();
+            const points = [];
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const dir = new THREE.Vector3().lerpVectors(dir1, dir2, t).normalize();
+                points.push(center.clone().add(dir.multiplyScalar(sphereRadius)));
+            }
+            const vertices = [adjCenter.x, adjCenter.y, adjCenter.z];
+            const normals = [new THREE.Vector3().addVectors(dir1, dir2).normalize().toArray()].flat();
+            points.forEach(p => {
+                vertices.push(p.x, p.y, p.z);
+                const n = new THREE.Vector3().subVectors(p, adjCenter).normalize();
+                normals.push(n.x, n.y, n.z);
+            });
+            const indices = [];
+            for (let i = 1; i < points.length; i++) indices.push(0, i, i + 1);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+            geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3));
+            geometry.setIndex(indices);
+            return new THREE.Mesh(geometry, createMatteMaterial(color));
+        }
+
+        function createSphericalTriangle(p1, p2, p3, center, color) {
+            const dir1 = new THREE.Vector3().subVectors(p1, center).normalize();
+            const dir2 = new THREE.Vector3().subVectors(p2, center).normalize();
+            const dir3 = new THREE.Vector3().subVectors(p3, center).normalize();
+            const subdivisions = 96;
+            const vertices = [], normals = [];
+            
+            for (let i = 0; i <= subdivisions; i++) {
+                for (let j = 0; j <= subdivisions - i; j++) {
+                    const u = i / subdivisions, v = j / subdivisions;
+                    const w = 1 - u - v;
+                    const dir = new THREE.Vector3().copy(dir1).multiplyScalar(u)
+                        .add(dir2.clone().multiplyScalar(v))
+                        .add(dir3.clone().multiplyScalar(w)).normalize();
+                    const point = center.clone().add(dir.multiplyScalar(sphereRadius));
+                    vertices.push(point.x, point.y, point.z);
+                    normals.push(dir.x, dir.y, dir.z);
+                }
+            }
+            
+            const indices = [];
+            let idx = 0;
+            for (let i = 0; i < subdivisions; i++) {
+                for (let j = 0; j < subdivisions - i; j++) {
+                    const current = idx;
+                    const nextRow = current + (subdivisions - i + 1);
+                    indices.push(current, current + 1, nextRow);
+                    if (j < subdivisions - i - 1) {
+                        indices.push(current + 1, nextRow + 1, nextRow);
+                    }
+                    idx++;
+                }
+                idx++;
+            }
+            
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+            geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3));
+            geometry.setIndex(indices);
+            
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color, 
+                roughness: 0.48, 
+                metalness: 0.04, 
+                side: THREE.DoubleSide,
+                emissive: 0x335577,
+                emissiveIntensity: 0.12,
+                flatShading: false
+            });
+            return new THREE.Mesh(geometry, material);
+        }
+
+        const cornerSpheres = []; // 角球结构（所有mesh）
+        
+        // 原始结构
+        const fullSphere = new THREE.Mesh(new THREE.SphereGeometry(sphereRadius, 160, 160), createMatteMaterial(uniformColor));
+        fullSphere.position.copy(sphereCenter);
+        scene.add(fullSphere);
+
+        const originalSectors = [
+            { pos: [ half, -half + yOffset + verticalShift,  half], rot: [Math.PI, 0, 0] },
+            { pos: [-half, -half + yOffset + verticalShift,  half], rot: [Math.PI, Math.PI/2, 0] },
+            { pos: [-half, -half + yOffset + verticalShift, -half], rot: [Math.PI, Math.PI, 0] },
+            { pos: [ half, -half + yOffset + verticalShift, -half], rot: [Math.PI, -Math.PI/2, 0] }
+        ];
+        originalSectors.forEach(s => {
+            const octant = createOctant(s.pos, s.rot, uniformColor);
+            scene.add(octant);
+            cornerSpheres.push(octant);
+        });
+
+        const originalBlocks = [
+            { num: 1, center: vertices[3], corners: [{ dir: new THREE.Vector3(0, 0, -1) }, { dir: new THREE.Vector3(-1, 0, 0) }, { dir: new THREE.Vector3(0, -1, 0) }] },
+            { num: 2, center: vertices[2], corners: [{ dir: new THREE.Vector3(1, 0, 0) }, { dir: new THREE.Vector3(0, -1, 0) }, { dir: new THREE.Vector3(0, 0, -1) }] },
+            { num: 3, center: vertices[6], corners: [{ dir: new THREE.Vector3(1, 0, 0) }, { dir: new THREE.Vector3(0, -1, 0) }, { dir: new THREE.Vector3(0, 0, 1) }] },
+            { num: 4, center: vertices[7], corners: [{ dir: new THREE.Vector3(-1, 0, 0) }, { dir: new THREE.Vector3(0, -1, 0) }, { dir: new THREE.Vector3(0, 0, 1) }] }
+        ];
+
+        const originalCornerPos = {};
+        originalBlocks.forEach(block => {
+            originalCornerPos[block.num] = [];
+            block.corners.forEach(corner => {
+                originalCornerPos[block.num].push(block.center.clone().add(corner.dir.clone().multiplyScalar(sphereRadius)));
+            });
+        });
+        
+        originalBlocks.forEach(block => {
+            const c = originalCornerPos[block.num];
+            const face1 = createFace(block.center, c[0], c[1], uniformColor);
+            const face2 = createFace(block.center, c[1], c[2], uniformColor);
+            const face3 = createFace(block.center, c[2], c[0], uniformColor);
+            scene.add(face1); scene.add(face2); scene.add(face3);
+            cornerSpheres.push(face1, face2, face3);
+        });
+
+        // 对称结构
+        const mirrorCenters = {}, mirrorCorners = {};
+        originalBlocks.forEach(block => {
+            const num = block.num;
+            mirrorCenters[num] = mirrorAboutPlane(block.center);
+            mirrorCorners[num] = [];
+            block.corners.forEach(corner => {
+                const origPos = block.center.clone().add(corner.dir.clone().multiplyScalar(sphereRadius));
+                mirrorCorners[num].push(mirrorAboutPlane(origPos));
+            });
+        });
+        
+        [1, 2, 3, 4].forEach(num => {
+            const center = mirrorCenters[num], corners = mirrorCorners[num];
+            const face1 = createFace(center, corners[0], corners[1], uniformColor);
+            const face2 = createFace(center, corners[1], corners[2], uniformColor);
+            const face3 = createFace(center, corners[2], corners[0], uniformColor);
+            scene.add(face1); scene.add(face2); scene.add(face3);
+            cornerSpheres.push(face1, face2, face3);
+        });
+        
+        [1, 2, 3, 4].forEach(blockNum => {
+            const corners = mirrorCorners[blockNum], center = mirrorCenters[blockNum];
+            if (corners && corners.length === 3 && center) {
+                const mirrorTriangle = createSphericalTriangle(corners[0], corners[1], corners[2], center, uniformColor);
+                scene.add(mirrorTriangle);
+                cornerSpheres.push(mirrorTriangle);
+            }
+        });
+
+        // 立方体边框
+        let centerX = 0, centerY = 0, centerZ = 0;
+        vertices.forEach(v => { centerX += v.x; centerY += v.y; centerZ += v.z; });
+        centerX /= 8; centerY /= 8; centerZ /= 8;
+        const offset = new THREE.Vector3(sphereCenter.x - centerX, sphereCenter.y - centerY, sphereCenter.z - centerZ);
+        const movedVertices = vertices.map(v => v.clone().add(offset));
+        
+        const edges = [
+            [0,1], [1,2], [2,3], [3,0],  // 底面
+            [4,5], [5,6], [6,7], [7,4],  // 顶面
+            [0,4], [1,5], [2,6], [3,7]   // 垂直棱
+        ];
+        
+        const cubeEdgesGroup = new THREE.Group();
+        edges.forEach(edge => {
+            const p1 = movedVertices[edge[0]], p2 = movedVertices[edge[1]];
+            const geometry = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+            cubeEdgesGroup.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x3a4a5a })));
+        });
+        scene.add(cubeEdgesGroup);
+        
+        // ========== 创建棱心球 ==========
+        const edgeSphereGroup = new THREE.Group();
+        
+        const facesList = [
+            { vertices: [0,1,2,3], normal: new THREE.Vector3(0, 0, 1) },
+            { vertices: [4,5,6,7], normal: new THREE.Vector3(0, 0, -1) },
+            { vertices: [0,1,5,4], normal: new THREE.Vector3(0, 1, 0) },
+            { vertices: [3,2,6,7], normal: new THREE.Vector3(0, -1, 0) },
+            { vertices: [0,3,7,4], normal: new THREE.Vector3(1, 0, 0) },
+            { vertices: [1,2,6,5], normal: new THREE.Vector3(-1, 0, 0) }
+        ];
+        
+        const edgeInfoMap = new Map();
+        
+        facesList.forEach(face => {
+            const faceVertices = face.vertices;
+            const normal = face.normal;
+            
+            const faceEdges = [
+                [faceVertices[0], faceVertices[1]],
+                [faceVertices[1], faceVertices[2]],
+                [faceVertices[2], faceVertices[3]],
+                [faceVertices[3], faceVertices[0]]
+            ];
+            
+            faceEdges.forEach(edge => {
+                const v1 = edge[0], v2 = edge[1];
+                const p1 = movedVertices[v1];
+                const p2 = movedVertices[v2];
+                const edgeCenter = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+                const edgeDir = new THREE.Vector3().subVectors(p2, p1).normalize();
+                
+                let faceCenter = new THREE.Vector3(0, 0, 0);
+                faceVertices.forEach(vIdx => {
+                    faceCenter.add(movedVertices[vIdx]);
+                });
+                faceCenter.divideScalar(4);
+                
+                const toFaceCenter = new THREE.Vector3().subVectors(faceCenter, edgeCenter).normalize();
+                const projection = toFaceCenter.clone().sub(edgeDir.clone().multiplyScalar(toFaceCenter.dot(edgeDir)));
+                const perpDir = projection.normalize();
+                
+                const segments = 56;
+                const verticesArr = [edgeCenter.x, edgeCenter.y, edgeCenter.z];
+                const normalsArr = [normal.x, normal.y, normal.z];
+                
+                for (let i = 0; i <= segments; i++) {
+                    const angle = Math.PI * i / segments;
+                    const dx = Math.cos(angle) * sphereRadius;
+                    const dy = Math.sin(angle) * sphereRadius;
+                    const point = edgeCenter.clone()
+                        .add(edgeDir.clone().multiplyScalar(dx))
+                        .add(perpDir.clone().multiplyScalar(dy));
+                    verticesArr.push(point.x, point.y, point.z);
+                    normalsArr.push(normal.x, normal.y, normal.z);
+                }
+                
+                const indicesArr = [];
+                for (let i = 1; i <= segments; i++) {
+                    indicesArr.push(0, i, i + 1);
+                }
+                
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verticesArr), 3));
+                geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normalsArr), 3));
+                geometry.setIndex(indicesArr);
+                
+                const material = new THREE.MeshStandardMaterial({
+                    color: uniformColor,
+                    roughness: 0.58,
+                    metalness: 0.03,
+                    side: THREE.DoubleSide,
+                    transparent: false,
+                    opacity: 1.0
+                });
+                
+                const halfDisk = new THREE.Mesh(geometry, material);
+                edgeSphereGroup.add(halfDisk);
+                
+                const edgeKey = `${Math.min(v1, v2)}-${Math.max(v1, v2)}`;
+                if (!edgeInfoMap.has(edgeKey)) {
+                    edgeInfoMap.set(edgeKey, {
+                        center: edgeCenter,
+                        dir: edgeDir,
+                        perpDirs: [perpDir],
+                        normals: [normal]
+                    });
+                } else {
+                    const info = edgeInfoMap.get(edgeKey);
+                    info.perpDirs.push(perpDir);
+                    info.normals.push(normal);
+                }
+            });
+        });
+        
+        edgeInfoMap.forEach((info) => {
+            const edgeCenter = info.center;
+            const edgeDir = info.dir;
+            const perp1 = info.perpDirs[0];
+            const perp2 = info.perpDirs[1];
+            
+            const cubeCenterDir = sphereCenter.clone().sub(edgeCenter).normalize();
+            const rotAxis = edgeDir;
+            
+            const rotPos = perp1.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(rotAxis, Math.PI/2));
+            const rotNeg = perp1.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(rotAxis, -Math.PI/2));
+            
+            let endAngle;
+            if (rotPos.dot(perp2) > rotNeg.dot(perp2)) {
+                endAngle = Math.PI / 2;
+            } else {
+                endAngle = -Math.PI / 2;
+            }
+            
+            const midAngle = endAngle / 2;
+            const midDir = perp1.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(rotAxis, midAngle));
+            
+            if (midDir.dot(cubeCenterDir) < 0) {
+                endAngle = -endAngle;
+            }
+            
+            const phiSteps = 56;
+            const thetaSteps = 36;
+            
+            const verticesSphere = [];
+            const indicesSphere = [];
+            const normalsSphere = [];
+            
+            for (let i = 0; i <= phiSteps; i++) {
+                const t = i / phiSteps;
+                const angle = t * endAngle;
+                const currentDir = perp1.clone().applyQuaternion(
+                    new THREE.Quaternion().setFromAxisAngle(edgeDir, angle)
+                );
+                
+                for (let j = 0; j <= thetaSteps; j++) {
+                    const theta = -Math.PI / 2 + (j / thetaSteps) * Math.PI;
+                    const alongEdge = edgeDir.clone().multiplyScalar(Math.sin(theta) * sphereRadius);
+                    const radialDir = currentDir.clone().multiplyScalar(Math.cos(theta));
+                    const point = edgeCenter.clone().add(alongEdge).add(radialDir.multiplyScalar(sphereRadius));
+                    
+                    const normalDir = point.clone().sub(edgeCenter).normalize();
+                    
+                    verticesSphere.push(point.x, point.y, point.z);
+                    normalsSphere.push(normalDir.x, normalDir.y, normalDir.z);
+                }
+            }
+            
+            for (let i = 0; i < phiSteps; i++) {
+                for (let j = 0; j < thetaSteps; j++) {
+                    const idx = i * (thetaSteps + 1) + j;
+                    const nextRow = (i + 1) * (thetaSteps + 1) + j;
+                    
+                    indicesSphere.push(idx, idx + 1, nextRow);
+                    indicesSphere.push(idx + 1, nextRow + 1, nextRow);
+                }
+            }
+            
+            const sphereGeometry = new THREE.BufferGeometry();
+            sphereGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verticesSphere), 3));
+            sphereGeometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normalsSphere), 3));
+            sphereGeometry.setIndex(indicesSphere);
+            
+            const sphereMaterial = new THREE.MeshStandardMaterial({
+                color: uniformColor,
+                roughness: 0.48,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                transparent: false,
+                opacity: 1.0
+            });
+            
+            const quarterSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            edgeSphereGroup.add(quarterSphere);
+        });
+        
+        scene.add(edgeSphereGroup);
+        
+        // ========== 创建面心球（面心圆盘 + 半球面） ==========
+        const faceSphereGroup = new THREE.Group();
+        
+        const faceCentersCorrect = [
+            { vertices: [0,1,2,3], normal: new THREE.Vector3(0, 0, 1) },
+            { vertices: [4,5,6,7], normal: new THREE.Vector3(0, 0, -1) },
+            { vertices: [0,1,5,4], normal: new THREE.Vector3(0, 1, 0) },
+            { vertices: [3,2,6,7], normal: new THREE.Vector3(0, -1, 0) },
+            { vertices: [0,3,7,4], normal: new THREE.Vector3(1, 0, 0) },
+            { vertices: [1,2,6,5], normal: new THREE.Vector3(-1, 0, 0) }
+        ];
+        
+        faceCentersCorrect.forEach(face => {
+            const faceVertices = face.vertices;
+            let faceCenter = new THREE.Vector3(0, 0, 0);
+            faceVertices.forEach(vIdx => {
+                faceCenter.add(movedVertices[vIdx]);
+            });
+            faceCenter.divideScalar(4);
+            
+            const normal = face.normal;
+            
+            // 面心圆盘
+            const diskGeometry = new THREE.CircleGeometry(sphereRadius, 64);
+            const diskMaterial = new THREE.MeshStandardMaterial({
+                color: uniformColor,
+                roughness: 0.55,
+                metalness: 0.03,
+                side: THREE.DoubleSide,
+                transparent: false
+            });
+            
+            const disk = new THREE.Mesh(diskGeometry, diskMaterial);
+            disk.position.copy(faceCenter);
+            
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1),
+                normal
+            );
+            disk.quaternion.copy(quaternion);
+            
+            faceSphereGroup.add(disk);
+            
+            // 半球面（球心在面心，向立方体内部凸出）
+            const inwardNormal = normal.clone().negate();
+            const up = inwardNormal;
+            let refX = new THREE.Vector3(1, 0, 0);
+            if (Math.abs(up.dot(refX)) > 0.9999) {
+                refX = new THREE.Vector3(0, 1, 0);
+            }
+            const localX = new THREE.Vector3().crossVectors(up, refX).normalize();
+            const localY = new THREE.Vector3().crossVectors(localX, up).normalize();
+            
+            const phiSteps = 64;
+            const thetaSteps = 48;
+            
+            const verticesHemisphere = [];
+            const indicesHemisphere = [];
+            const normalsHemisphere = [];
+            
+            for (let i = 0; i <= phiSteps; i++) {
+                const phi = (i / phiSteps) * Math.PI * 2;
+                const cosPhi = Math.cos(phi);
+                const sinPhi = Math.sin(phi);
+                
+                for (let j = 0; j <= thetaSteps; j++) {
+                    const theta = (j / thetaSteps) * Math.PI / 2;
+                    const sinTheta = Math.sin(theta);
+                    const cosTheta = Math.cos(theta);
+                    
+                    const localPoint = new THREE.Vector3(
+                        sinTheta * cosPhi * sphereRadius,
+                        sinTheta * sinPhi * sphereRadius,
+                        cosTheta * sphereRadius
+                    );
+                    
+                    const worldPoint = faceCenter.clone().add(
+                        localX.clone().multiplyScalar(localPoint.x)
+                    ).add(
+                        localY.clone().multiplyScalar(localPoint.y)
+                    ).add(
+                        up.clone().multiplyScalar(localPoint.z)
+                    );
+                    
+                    const normalDir = worldPoint.clone().sub(faceCenter).normalize();
+                    
+                    verticesHemisphere.push(worldPoint.x, worldPoint.y, worldPoint.z);
+                    normalsHemisphere.push(normalDir.x, normalDir.y, normalDir.z);
+                }
+            }
+            
+            for (let i = 0; i < phiSteps; i++) {
+                for (let j = 0; j < thetaSteps; j++) {
+                    const idx = i * (thetaSteps + 1) + j;
+                    const nextRow = (i + 1) * (thetaSteps + 1) + j;
+                    
+                    indicesHemisphere.push(idx, idx + 1, nextRow);
+                    indicesHemisphere.push(idx + 1, nextRow + 1, nextRow);
+                }
+            }
+            
+            const hemisphereGeometry = new THREE.BufferGeometry();
+            hemisphereGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verticesHemisphere), 3));
+            hemisphereGeometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normalsHemisphere), 3));
+            hemisphereGeometry.setIndex(indicesHemisphere);
+            
+            const hemisphereMaterial = new THREE.MeshStandardMaterial({
+                color: uniformColor,
+                roughness: 0.48,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                transparent: false,
+                opacity: 1.0
+            });
+            
+            const hemisphere = new THREE.Mesh(hemisphereGeometry, hemisphereMaterial);
+            faceSphereGroup.add(hemisphere);
+        });
+        
+        scene.add(faceSphereGroup);
+        
+        // 控制器
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 1.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.8;
+        controls.touchRotate = true;
+        controls.touchZoom = true;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.copy(sphereCenter);
+        
+        // 开关逻辑（底部开关）
+        const toggleSphere = document.getElementById('toggleSphere');
+        const toggleCubeEdges = document.getElementById('toggleCubeEdges');
+        
+        toggleSphere.addEventListener('change', e => fullSphere.visible = e.target.checked);
+        toggleCubeEdges.addEventListener('change', e => cubeEdgesGroup.visible = e.target.checked);
+        
+        // ========== 射线交互：点击切换面心球、棱心球、角球的显隐 ==========
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        // 收集所有可点击的物体
+        const clickableObjects = [];
+        
+        // 面心球的所有mesh
+        faceSphereGroup.children.forEach(child => {
+            if (child.isMesh) {
+                clickableObjects.push(child);
+            }
+        });
+        
+        // 棱心球的所有mesh
+        edgeSphereGroup.children.forEach(child => {
+            if (child.isMesh) {
+                clickableObjects.push(child);
+            }
+        });
+        
+        // 角球的所有mesh
+        cornerSpheres.forEach(child => {
+            if (child.isMesh) {
+                clickableObjects.push(child);
+            }
+        });
+        
+        // 记录各组显隐状态
+        let faceSphereVisible = true;
+        let edgeSphereVisible = true;
+        let cornerSphereVisible = true;
+        
+        // 点击事件（同时支持鼠标和触屏）
+        renderer.domElement.addEventListener('click', (event) => {
+            // 计算鼠标位置归一化坐标
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableObjects);
+            
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                
+                // 判断点击的是哪个组的物体
+                let hitGroup = null;
+                if (faceSphereGroup.children.includes(hit)) {
+                    hitGroup = 'faceSphere';
+                } else if (edgeSphereGroup.children.includes(hit)) {
+                    hitGroup = 'edgeSphere';
+                } else if (cornerSpheres.includes(hit)) {
+                    hitGroup = 'cornerSphere';
+                }
+                
+                // 切换对应组的显隐
+                if (hitGroup === 'faceSphere') {
+                    faceSphereVisible = !faceSphereVisible;
+                    faceSphereGroup.visible = faceSphereVisible;
+                } else if (hitGroup === 'edgeSphere') {
+                    edgeSphereVisible = !edgeSphereVisible;
+                    edgeSphereGroup.visible = edgeSphereVisible;
+                } else if (hitGroup === 'cornerSphere') {
+                    cornerSphereVisible = !cornerSphereVisible;
+                    cornerSpheres.forEach(obj => obj.visible = cornerSphereVisible);
+                }
+            }
+        });
+        
+        // 触屏设备支持
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            if (e.target === renderer.domElement) {
+                e.preventDefault();
+                if (e.touches.length === 1) {
+                    const rect = renderer.domElement.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+                    mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+                    
+                    raycaster.setFromCamera(mouse, camera);
+                    const intersects = raycaster.intersectObjects(clickableObjects);
+                    
+                    if (intersects.length > 0) {
+                        const hit = intersects[0].object;
+                        
+                        let hitGroup = null;
+                        if (faceSphereGroup.children.includes(hit)) {
+                            hitGroup = 'faceSphere';
+                        } else if (edgeSphereGroup.children.includes(hit)) {
+                            hitGroup = 'edgeSphere';
+                        } else if (cornerSpheres.includes(hit)) {
+                            hitGroup = 'cornerSphere';
+                        }
+                        
+                        if (hitGroup === 'faceSphere') {
+                            faceSphereVisible = !faceSphereVisible;
+                            faceSphereGroup.visible = faceSphereVisible;
+                        } else if (hitGroup === 'edgeSphere') {
+                            edgeSphereVisible = !edgeSphereVisible;
+                            edgeSphereGroup.visible = edgeSphereVisible;
+                        } else if (hitGroup === 'cornerSphere') {
+                            cornerSphereVisible = !cornerSphereVisible;
+                            cornerSpheres.forEach(obj => obj.visible = cornerSphereVisible);
+                        }
+                    }
+                }
+            }
+        }, { passive: false });
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        console.log('点击交互已启用：点击面心球/棱心球/角球可切换显隐');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

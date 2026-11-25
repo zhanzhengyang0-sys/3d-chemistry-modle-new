@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>S₈ 分子结构 - 3D 模型</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: white;
+    }
+  </style>
+</head>
+<body>
+  <!-- 引入 Three.js 核心库 -->
+  <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+    // ---------- 初始化场景 ----------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    // ---------- 初始化相机 ----------
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // 稍拉远相机以适应更大的环
+    camera.position.set(6.0, 4.5, 7.8);
+    camera.lookAt(0, 0, 0);
+
+    // ---------- 初始化 WebGL渲染器 ----------
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: false 
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0xffffff, 1);
+    document.body.appendChild(renderer.domElement);
+
+    // ---------- 控制器 ----------
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.rotateSpeed = 0.8;
+    controls.zoomSpeed = 1.2;
+    controls.panSpeed = 0.7;
+    controls.autoRotate = false;
+    controls.enableZoom = true;
+    controls.target.set(0, 0, 0);
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI;
+    controls.update();
+
+    // ---------- 光照设置 ----------
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.6);
+    directionalLight1.position.set(1, 2, 1.5);
+    scene.add(directionalLight1);
+    
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.35);
+    directionalLight2.position.set(-0.8, -0.5, -1);
+    scene.add(directionalLight2);
+    
+    const directionalLight3 = new THREE.DirectionalLight(0xffffff, 0.3);
+    directionalLight3.position.set(0, 1.8, 0.2);
+    scene.add(directionalLight3);
+    
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.25);
+    backLight.position.set(-0.5, -1, 0.8);
+    scene.add(backLight);
+
+    // ---------- 构建 S₈ 分子（皇冠构象）----------
+    const moleculeGroup = new THREE.Group();
+    
+    // S₈ 结构参数（增大环半径以加长键长）
+    const ringRadius = 2.1;      // 从1.8增加到2.1
+    const planeSeparation = 1.2; // 上下平面间距保持不变
+    const segments = 8;
+    
+    // 硫原子参数
+    const sulfurColor = 0x9acd32; // 黄绿色
+    const sulfurRadius = 0.55;
+    const sulfurSegments = 48;
+    
+    // 化学键参数
+    const bondColor = 0xb0b0b0;  // 灰白色键
+    const bondRadius = 0.10;
+    const bondSegments = 8;
+    
+    // 计算8个硫原子的位置
+    const sulfurPositions = [];
+    
+    for (let i = 0; i < segments; i++) {
+      const angle = (i * Math.PI * 2) / segments + Math.PI / 8;
+      
+      const x = ringRadius * Math.cos(angle);
+      const z = ringRadius * Math.sin(angle);
+      
+      const y = (i % 2 === 0) ? planeSeparation / 2 : -planeSeparation / 2;
+      
+      sulfurPositions.push(new THREE.Vector3(x, y, z));
+    }
+    
+    // 创建硫原子
+    sulfurPositions.forEach((pos) => {
+      const geometry = new THREE.SphereGeometry(sulfurRadius, sulfurSegments, sulfurSegments);
+      const material = new THREE.MeshStandardMaterial({
+        color: sulfurColor,
+        roughness: 0.6,
+        metalness: 0.05,
+        emissive: new THREE.Color(0x000000)
+      });
+      const atom = new THREE.Mesh(geometry, material);
+      atom.position.copy(pos);
+      moleculeGroup.add(atom);
+    });
+    
+    // 辅助函数：创建两点之间的圆柱体键
+    function createBond(posA, posB) {
+      const direction = new THREE.Vector3().subVectors(posB, posA);
+      const length = direction.length();
+      const midPoint = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
+      
+      const geometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, bondSegments);
+      const material = new THREE.MeshStandardMaterial({
+        color: bondColor,
+        roughness: 0.6,
+        metalness: 0.2,
+        emissive: new THREE.Color(0x000000)
+      });
+      
+      const cylinder = new THREE.Mesh(geometry, material);
+      cylinder.position.copy(midPoint);
+      
+      cylinder.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.clone().normalize()
+      );
+      
+      return cylinder;
+    }
+    
+    // 创建 S-S 键（环形连接）
+    for (let i = 0; i < segments; i++) {
+      const currentPos = sulfurPositions[i];
+      const nextPos = sulfurPositions[(i + 1) % segments];
+      
+      const bond = createBond(currentPos, nextPos);
+      moleculeGroup.add(bond);
+    }
+    
+    // 将分子组添加到场景
+    scene.add(moleculeGroup);
+    
+    // ---------- 动画循环 ----------
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      controls.update();
+      
+      renderer.render(scene, camera);
+    }
+    
+    animate();
+    
+    // ---------- 窗口大小自适应 ----------
+    window.addEventListener('resize', onWindowResize, false);
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    console.log('S₈ 分子结构已加载。键长已加长，黄绿色硫原子（哑光）| 灰白色S-S键 | 皇冠构象');
+  </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

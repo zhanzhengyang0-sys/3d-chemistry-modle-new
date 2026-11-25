@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>晶胞结构 · 正交投影 · 五类位置可视化（8四面体空隙）</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0; padding: 0; height: 100%;
+        overflow: hidden; background: #ffffff;
+    }
+    body {
+        font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none; user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+    }
+    canvas { display: block; touch-action: none; }
+
+    /* ============ 左上角提示 ============ */
+    .hint {
+        position: fixed;
+        top: max(12px, env(safe-area-inset-top));
+        left: max(12px, env(safe-area-inset-left));
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.45);
+        color: #eaeaea;
+        font-size: 11px;
+        font-family: monospace;
+        letter-spacing: 0.3px;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        z-index: 10;
+        pointer-events: none;
+        white-space: nowrap;
+    }
+    .hint .touch { display: none; }
+    @media (hover: none) and (pointer: coarse) {
+        .hint .mouse { display: none; }
+        .hint .touch { display: inline; }
+    }
+
+    /* ============ 右上角体对角线按钮 ============ */
+    .diag-btn {
+        position: fixed;
+        top: max(12px, env(safe-area-inset-top));
+        right: max(12px, env(safe-area-inset-right));
+        padding: 8px 15px;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.10);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        font-family: inherit;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #2b2b2b;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        z-index: 10;
+        white-space: nowrap;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        transition: transform 0.15s ease;
+    }
+    .diag-btn:active { transform: scale(0.95); }
+
+    /* ============ 底部控制面板 ============ */
+    .panel {
+        position: fixed;
+        left: 50%;
+        bottom: max(14px, env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        width: max-content;
+        max-width: calc(100vw - 16px);
+        background: rgba(255, 255, 255, 0.90);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 18px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+        z-index: 10;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 13px;
+        min-height: 36px;
+        border-radius: 999px;
+        border: 1.5px solid #e6e6e6;
+        background: #f7f7f7;
+        color: #b4b4b4;
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        letter-spacing: 0.2px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.18s ease;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+    .chip .dot {
+        width: 11px; height: 11px;
+        border-radius: 50%;
+        background: var(--c);
+        opacity: 0.22;
+        transition: opacity 0.18s ease, box-shadow 0.18s ease;
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
+        flex: none;
+    }
+    .chip .num {
+        font-size: 11px;
+        font-weight: 500;
+        opacity: 0.7;
+    }
+    .chip .lbl.short { display: none; }
+
+    .chip.on {
+        color: #141414;
+        background: #ffffff;
+        border-color: var(--c);
+        box-shadow: 0 2px 12px -2px var(--c);
+    }
+    .chip.on .dot {
+        opacity: 1;
+        box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9), 0 0 6px var(--c);
+    }
+    .chip:active { transform: scale(0.95); }
+
+    /* ============ 小屏 / 触屏：单行紧凑铺满，6 项完整展现 ============ */
+    @media (max-width: 760px) {
+        .panel {
+            flex-wrap: nowrap;
+            gap: 4px;
+            padding: 8px 7px;
+            width: calc(100vw - 16px);
+            border-radius: 16px;
+        }
+        .chip {
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 7px 1px;
+            min-height: 40px;
+            font-size: 11px;
+            gap: 3px;
+            letter-spacing: 0;
+            border-radius: 10px;
+        }
+        .chip .dot { width: 8px; height: 8px; }
+        .chip .num { display: none; }
+        .chip .lbl.full { display: none; }
+        .chip .lbl.short { display: inline; }
+        .hint { font-size: 10px; padding: 5px 9px; }
+        .diag-btn { font-size: 11px; padding: 7px 12px; }
+    }
+    @media (max-width: 380px) {
+        .panel { gap: 3px; padding: 7px 5px; }
+        .chip { font-size: 10px; padding: 6px 0; gap: 2px; }
+        .chip .dot { width: 6px; height: 6px; }
+    }
+</style>
+
+</head>
+<body>
+
+<div class="hint">
+    <span class="mouse">🖱️ 拖拽旋转 · 滚轮缩放</span>
+    <span class="touch">👆 单指旋转 · 双指缩放</span>
+</div>
+<button class="diag-btn" id="diagBtn">⬡ 体对角线视角</button>
+<div class="panel" id="panel"></div>
+
+<script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+    /* ============================================================
+       1. 场景 / 渲染器
+       ============================================================ */
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    document.body.appendChild(renderer.domElement);
+
+    /* ============================================================
+       2. 正交相机 —— 消除「近大远小」
+          沿体对角线方向观察时，投影轮廓为标准正六边形
+       ============================================================ */
+    const CENTER = new THREE.Vector3(0.5, 0.5, 0.5);
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+    camera.position.set(3.4, 2.7, 4.0);
+    camera.lookAt(CENTER);
+
+    function updateFrustum() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const aspect = w / h;
+        // 立方体沿任意方向投影最大半半径 ≈ 0.866 + 球半径 0.092 ≈ 0.958
+        const MIN = 1.06;
+        const halfH = Math.max(MIN, MIN / aspect);
+        const halfW = halfH * aspect;
+
+        camera.left   = -halfW;
+        camera.right  =  halfW;
+        camera.top    =  halfH;
+        camera.bottom = -halfH;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(w, h);
+    }
+    updateFrustum();
+
+    /* ============================================================
+       3. 轨道控制器
+       ============================================================ */
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(CENTER);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.rotateSpeed = 1.0;
+    controls.zoomSpeed = 1.1;
+    controls.minZoom = 0.5;
+    controls.maxZoom = 3.0;
+    controls.maxPolarAngle = Math.PI;
+    controls.update();
+
+    /* ============================================================
+       4. 灯光
+       ============================================================ */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.68));
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.75);
+    keyLight.position.set(5, 8, 6);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.40);
+    fillLight.position.set(-6, -3, -5);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.30);
+    rimLight.position.set(-3, 5, -6);
+    scene.add(rimLight);
+
+    /* ============================================================
+       5. 晶胞棱边（灰色细圆柱）
+       ============================================================ */
+    const edgePairs = [
+        [[0,0,0],[1,0,0]], [[1,0,0],[1,0,1]], [[1,0,1],[0,0,1]], [[0,0,1],[0,0,0]],
+        [[0,1,0],[1,1,0]], [[1,1,0],[1,1,1]], [[1,1,1],[0,1,1]], [[0,1,1],[0,1,0]],
+        [[0,0,0],[0,1,0]], [[1,0,0],[1,1,0]], [[1,0,1],[1,1,1]], [[0,0,1],[0,1,1]]
+    ];
+
+    const edgeMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8d949e, roughness: 0.6, metalness: 0.2
+    });
+    const edgeGeometry = new THREE.CylinderGeometry(0.0075, 0.0075, 1, 8);
+    const UP = new THREE.Vector3(0, 1, 0);
+
+    edgePairs.forEach(([a, b]) => {
+        const start = new THREE.Vector3(a[0], a[1], a[2]);
+        const end   = new THREE.Vector3(b[0], b[1], b[2]);
+        const dir   = new THREE.Vector3().subVectors(end, start);
+
+        const mesh = new THREE.Mesh(edgeGeometry, edgeMaterial);
+        mesh.position.addVectors(start, end).multiplyScalar(0.5);
+        mesh.quaternion.setFromUnitVectors(UP, dir.clone().normalize());
+        scene.add(mesh);
+    });
+
+    /* ============================================================
+       6. 各类位置坐标
+       ============================================================ */
+    // ---- 8 个角顶 ----
+    const cornerPositions = [];
+    for (let x = 0; x <= 1; x++)
+        for (let y = 0; y <= 1; y++)
+            for (let z = 0; z <= 1; z++)
+                cornerPositions.push([x, y, z]);
+
+    // ---- 6 个面心 ----
+    const facePositions = [
+        [0.5, 0.5, 0.0], [0.5, 0.5, 1.0],
+        [0.5, 0.0, 0.5], [0.5, 1.0, 0.5],
+        [0.0, 0.5, 0.5], [1.0, 0.5, 0.5]
+    ];
+
+    // ---- 12 个棱心 ----
+    const edgeCenterPositions = [];
+    [0, 1].forEach(y => [0, 1].forEach(z => edgeCenterPositions.push([0.5, y, z]))); // ∥ x
+    [0, 1].forEach(x => [0, 1].forEach(z => edgeCenterPositions.push([x, 0.5, z]))); // ∥ y
+    [0, 1].forEach(x => [0, 1].forEach(y => edgeCenterPositions.push([x, y, 0.5]))); // ∥ z
+
+    // ---- 1 个体心 ----
+    const bodyCenterPositions = [[0.5, 0.5, 0.5]];
+
+    /* ---- 8 个四面体空隙（萤石 CaF₂ 中 F⁻ 的 8 个位置） ----
+       分为两组，各 4 个，两组均为紫色，但分别独立开关
+       所有位置都是 (±1/4, ±1/4, ±1/4) 型的 8 个组合 */
+    const tetraPositionsA = [
+        [0.25, 0.25, 0.25],
+        [0.75, 0.75, 0.25],
+        [0.75, 0.25, 0.75],
+        [0.25, 0.75, 0.75]
+    ];
+    const tetraPositionsB = [
+        [0.75, 0.25, 0.25],
+        [0.25, 0.75, 0.25],
+        [0.25, 0.25, 0.75],
+        [0.75, 0.75, 0.75]
+    ];
+
+    /* ============================================================
+       7. 建球 —— 所有球半径统一为「体心球」的大小
+       ============================================================ */
+    const UNIFIED_RADIUS = 0.092;   // 与黄色（体心）球一致
+
+    const ionGroups = {};
+
+    function buildIonGroup(key, positions, colorHex, radius) {
+        const group = new THREE.Group();
+
+        const geometry = new THREE.SphereGeometry(radius, 48, 32);
+        const material = new THREE.MeshStandardMaterial({
+            color: colorHex,
+            roughness: 0.30,
+            metalness: 0.15,
+            emissive: new THREE.Color(colorHex).multiplyScalar(0.12)
+        });
+
+        positions.forEach(p => {
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.set(p[0], p[1], p[2]);
+            group.add(sphere);
+        });
+
+        scene.add(group);
+        ionGroups[key] = group;
+    }
+
+    // 位置类别 —— 颜色对比鲜明，尺寸完全一致
+    buildIonGroup('corner', cornerPositions,     0xE63946, UNIFIED_RADIUS); // 角顶：红
+    buildIonGroup('face',   facePositions,       0x1D6FE8, UNIFIED_RADIUS); // 面心：蓝
+    buildIonGroup('edge',   edgeCenterPositions, 0x2EC27E, UNIFIED_RADIUS); // 棱心：绿
+    buildIonGroup('body',   bodyCenterPositions, 0xFF9F0A, UNIFIED_RADIUS); // 体心：黄
+    buildIonGroup('tetraA', tetraPositionsA,     0xA259FF, UNIFIED_RADIUS); // 四面体空隙 A：紫
+    buildIonGroup('tetraB', tetraPositionsB,     0xA259FF, UNIFIED_RADIUS); // 四面体空隙 B：紫
+
+    /* ============================================================
+       8. 底部控制面板 —— 6 组独立显隐开关
+       ============================================================ */
+    const chipConfig = [
+        { key: 'corner', full: '角顶',        short: '角顶',  count: 8,  color: '#E63946' },
+        { key: 'face',   full: '面心',        short: '面心',  count: 6,  color: '#1D6FE8' },
+        { key: 'edge',   full: '棱心',        short: '棱心',  count: 12, color: '#2EC27E' },
+        { key: 'body',   full: '体心',        short: '体心',  count: 1,  color: '#FF9F0A' },
+        { key: 'tetraA', full: '四面体空隙①', short: '空隙①', count: 4, color: '#A259FF' },
+        { key: 'tetraB', full: '四面体空隙②', short: '空隙②', count: 4, color: '#A259FF' }
+    ];
+
+    const panel = document.getElementById('panel');
+
+    chipConfig.forEach(cfg => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip on';
+        btn.style.setProperty('--c', cfg.color);
+        btn.dataset.key = cfg.key;
+        btn.innerHTML =
+            `<span class="dot"></span>` +
+            `<span class="lbl full">${cfg.full}</span>` +
+            `<span class="lbl short">${cfg.short}</span>` +
+            `<span class="num">×${cfg.count}</span>`;
+
+        // 阻止按钮上的触摸/点击冒泡到画布
+        ['pointerdown', 'touchstart', 'mousedown'].forEach(ev =>
+            btn.addEventListener(ev, e => e.stopPropagation(), { passive: true })
+        );
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const group = ionGroups[cfg.key];
+            group.visible = !group.visible;
+            btn.classList.toggle('on', group.visible);
+        });
+
+        panel.appendChild(btn);
+    });
+
+    /* ============================================================
+       9. 体对角线视角（一键正六边形）
+       ============================================================ */
+    let camTween = null;
+
+    function flyTo(targetPos) {
+        camTween = {
+            from: camera.position.clone(),
+            to: targetPos.clone(),
+            t: 0
+        };
+    }
+
+    document.getElementById('diagBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        // 沿 (1,1,1) 方向观察立方体 → 正交投影轮廓为正六边形
+        const R = 6;
+        const s = R / Math.sqrt(3);
+        flyTo(new THREE.Vector3(0.5 + s, 0.5 + s, 0.5 + s));
+    });
+
+    /* ============================================================
+       10. 动画循环
+       ============================================================ */
+    function easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        if (camTween) {
+            camTween.t = Math.min(1, camTween.t + 0.055);
+            const k = easeInOutQuad(camTween.t);
+            camera.position.lerpVectors(camTween.from, camTween.to, k);
+            if (camTween.t >= 1) camTween = null;
+        }
+
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    /* ============================================================
+       11. 自适应 / 触屏适配
+       ============================================================ */
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(updateFrustum, 60);
+    }, false);
+    window.addEventListener('orientationchange', () => setTimeout(updateFrustum, 150), false);
+
+    // 阻止 iOS Safari 页面级双指缩放
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+        document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+    });
+
+    console.log('晶胞模型已启动 | 正交投影 | 8 角顶 / 6 面心 / 12 棱心 / 1 体心 / 8 四面体空隙（分两组紫色）');
+</script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

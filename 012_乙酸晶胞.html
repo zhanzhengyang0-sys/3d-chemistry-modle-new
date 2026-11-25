@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>乙酸分子3D | 点击单个分子变色 | 纯白背景 | 超薄选色板</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        canvas { display: block; touch-action: none; }
+
+        /* 极薄控制面板 */
+        .control-panel {
+            position: absolute;
+            bottom: max(18px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(25, 25, 32, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 40px;
+            padding: 4px 16px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            z-index: 200;
+            border: 0.5px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            pointer-events: auto;
+            touch-action: manipulation;
+            max-width: calc(100vw - 20px);
+            box-sizing: border-box;
+        }
+        .control-panel span {
+            color: #f0f0f0;
+            font-weight: 500;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .color-btn {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            min-height: 34px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.9);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            -webkit-tap-highlight-color: transparent;
+        }
+        .color-btn:active { transform: scale(0.94); }
+        .color-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 8px rgba(255,255,255,0.8);
+            border-color: #ffdd99;
+        }
+        .reset-btn {
+            background: rgba(45, 45, 55, 0.8);
+            border: 0.5px solid #aaa;
+            color: white;
+            padding: 8px 14px;
+            min-height: 34px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 12px;
+            transition: all 0.2s;
+            margin-left: 6px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .reset-btn:active {
+            background: #ff5555;
+            transform: scale(0.96);
+        }
+        hr {
+            margin: 0 6px;
+            height: 26px;
+            border: none;
+            border-left: 0.5px solid rgba(255,255,255,0.25);
+        }
+        @media (max-width: 700px) {
+            .control-panel { padding: 3px 10px; gap: 8px; }
+            .color-btn { width: 30px; height: 30px; min-width: 30px; min-height: 30px; }
+            .reset-btn { padding: 6px 10px; font-size: 11px; min-height: 30px; }
+            .control-panel span { font-size: 11px; }
+            hr { margin: 0 2px; }
+        }
+        .touch-note {
+            position: absolute;
+            bottom: calc(max(18px, env(safe-area-inset-bottom)) + 58px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            color: #aaa;
+            font-size: 10px;
+            padding: 3px 12px;
+            border-radius: 40px;
+            pointer-events: none;
+            z-index: 199;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="control-panel">
+        <span>🎨 点击分子</span>
+        <div class="color-btn" style="background-color: #ff4444;" data-color="red"></div>
+        <div class="color-btn" style="background-color: #44ff44;" data-color="green"></div>
+        <div class="color-btn" style="background-color: #4488ff;" data-color="blue"></div>
+        <div class="color-btn" style="background-color: #ffdd44;" data-color="yellow"></div>
+        <hr>
+        <button class="reset-btn" id="resetColorsBtn">↺ 恢复</button>
+    </div>
+    <div class="touch-note">✨ 点击任意分子，仅该分子变色</div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 初始化场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.rotateSpeed = 1.2;
+        controls.zoomSpeed = 1.2;
+        // 显式声明触屏手势
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+
+        // 用户一开始拖动，取消相机过渡动画，避免和用户操作打架
+        controls.addEventListener('start', () => { camTween = null; });
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0x6a6a7e));
+        const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+        mainLight.position.set(3, 8, 2);
+        mainLight.castShadow = true;
+        scene.add(mainLight);
+        const fillLight = new THREE.PointLight(0x88aaff, 0.45);
+        fillLight.position.set(-2, 3, 4);
+        scene.add(fillLight);
+        const backLight = new THREE.PointLight(0xffaa66, 0.4);
+        backLight.position.set(0, 2, -5);
+        scene.add(backLight);
+        const rimLight = new THREE.PointLight(0xffffff, 0.5);
+        rimLight.position.set(1, 2, -3);
+        scene.add(rimLight);
+        const bottomFill = new THREE.PointLight(0x88aacc, 0.25);
+        bottomFill.position.set(0, -1.8, 0);
+        scene.add(bottomFill);
+
+        // ==================== 大立方体线框 ====================
+        const cubeScale = 0.9;
+        const baseSide = 3.0;
+        const baseHeight = 6.9;
+        const side = baseSide * cubeScale;
+        const height = baseHeight * cubeScale;
+        const halfSide = side / 2;
+        const halfHeight = height / 2;
+
+        const cubeVertices = [
+            new THREE.Vector3(-halfSide, -halfHeight, -halfSide),
+            new THREE.Vector3( halfSide, -halfHeight, -halfSide),
+            new THREE.Vector3( halfSide, -halfHeight,  halfSide),
+            new THREE.Vector3(-halfSide, -halfHeight,  halfSide),
+            new THREE.Vector3(-halfSide,  halfHeight, -halfSide),
+            new THREE.Vector3( halfSide,  halfHeight, -halfSide),
+            new THREE.Vector3( halfSide,  halfHeight,  halfSide),
+            new THREE.Vector3(-halfSide,  halfHeight,  halfSide)
+        ];
+        const cubeEdges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+        const blackLineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+        cubeEdges.forEach(edge => {
+            const points = [cubeVertices[edge[0]], cubeVertices[edge[1]]];
+            const geom = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geom, blackLineMat);
+            scene.add(line);
+        });
+
+        // ==================== 小立方体网格定义 ====================
+        const divisionsVertical = 15;
+        const stepY = height / divisionsVertical;
+        const startY = -halfHeight;
+        const divisionsHorizontal = 7;
+        const minX = -halfSide, maxX = halfSide, minZ = -halfSide, maxZ = halfSide;
+        const stepX = (maxX - minX) / divisionsHorizontal;
+        const stepZ = (maxZ - minZ) / divisionsHorizontal;
+
+        const xSlices = [];
+        for (let i = 0; i <= divisionsHorizontal; i++) xSlices.push(minX + i * stepX);
+        const ySlices = [];
+        for (let j = 0; j <= divisionsVertical; j++) ySlices.push(startY + j * stepY);
+        const zSlices = [];
+        for (let k = 0; k <= divisionsHorizontal; k++) zSlices.push(minZ + k * stepZ);
+
+        const xCenters = [];
+        for (let i = 0; i < xSlices.length - 1; i++) xCenters.push((xSlices[i] + xSlices[i+1]) / 2);
+        const yCenters = [];
+        for (let j = 0; j < ySlices.length - 1; j++) yCenters.push((ySlices[j] + ySlices[j+1]) / 2);
+        const zCenters = [];
+        for (let k = 0; k < zSlices.length - 1; k++) zCenters.push((zSlices[k] + zSlices[k+1]) / 2);
+
+        const cubeCenters = [];
+        for (let i = 0; i < xCenters.length; i++) {
+            for (let j = 0; j < yCenters.length; j++) {
+                for (let k = 0; k < zCenters.length; k++) {
+                    cubeCenters.push(new THREE.Vector3(xCenters[i], yCenters[j], zCenters[k]));
+                }
+            }
+        }
+
+        const center198 = cubeCenters[197];
+        const center396 = cubeCenters[395];
+        const center152 = cubeCenters[151];
+        const center349 = cubeCenters[348];
+        const center377 = cubeCenters[376];
+        const center327 = cubeCenters[326];
+
+        const getFaceCenter = (idx) => {
+            const totalYZ = yCenters.length * zCenters.length;
+            const xIdx = Math.floor(idx / totalYZ);
+            const rem = idx % totalYZ;
+            const yIdx = Math.floor(rem / zCenters.length);
+            const zIdx = rem % zCenters.length;
+            const bounds = {
+                xMin: xSlices[xIdx], xMax: xSlices[xIdx+1],
+                yMin: ySlices[yIdx], yMax: ySlices[yIdx+1],
+                zMin: zSlices[zIdx], zMax: zSlices[zIdx+1]
+            };
+            const eps2 = 0.01;
+            if (Math.abs(bounds.xMax - halfSide) < eps2) return new THREE.Vector3(bounds.xMax, (bounds.yMin+bounds.yMax)/2, (bounds.zMin+bounds.zMax)/2);
+            if (Math.abs(bounds.xMin + halfSide) < eps2) return new THREE.Vector3(bounds.xMin, (bounds.yMin+bounds.yMax)/2, (bounds.zMin+bounds.zMax)/2);
+            if (Math.abs(bounds.yMax - halfHeight) < eps2) return new THREE.Vector3((bounds.xMin+bounds.xMax)/2, bounds.yMax, (bounds.zMin+bounds.zMax)/2);
+            if (Math.abs(bounds.yMin + halfHeight) < eps2) return new THREE.Vector3((bounds.xMin+bounds.xMax)/2, bounds.yMin, (bounds.zMin+bounds.zMax)/2);
+            if (Math.abs(bounds.zMax - halfSide) < eps2) return new THREE.Vector3((bounds.xMin+bounds.xMax)/2, (bounds.yMin+bounds.yMax)/2, bounds.zMax);
+            return new THREE.Vector3((bounds.xMin+bounds.xMax)/2, (bounds.yMin+bounds.yMax)/2, bounds.zMin);
+        };
+        const faceCenter697 = getFaceCenter(696);
+        const faceCenter647 = getFaceCenter(646);
+
+        // ==================== 分子参数 ====================
+        const MOLECULE_SCALE = 0.42;
+        const rC = 0.5 * MOLECULE_SCALE;
+        const rO = 0.4 * MOLECULE_SCALE;
+        const rH = 0.3 * MOLECULE_SCALE;
+
+        const makeMaterials = () => ({
+            carbon: new THREE.MeshStandardMaterial({ color: 0x2c2c2c, roughness: 0.25, metalness: 0.1 }),
+            hydrogen: new THREE.MeshStandardMaterial({ color: 0x4a7db4, roughness: 0.3 }),
+            oxygen: new THREE.MeshStandardMaterial({ color: 0xdd6b20, roughness: 0.28 }),
+            bond: new THREE.MeshStandardMaterial({ color: 0x9aa8b5, roughness: 0.4 })
+        });
+
+        function createAceticAcid(methylRotationDeg, mirrorX, materials) {
+            const group = new THREE.Group();
+            const bondScale = MOLECULE_SCALE;
+            const chLen = 1.4 * bondScale;
+            const lenCO = 1.25 * bondScale;
+            const lenCOH = 1.36 * bondScale;
+            const lenOH = 0.98 * bondScale;
+            const ccLen = 1.6 * bondScale;
+
+            const cMethylPos = new THREE.Vector3(0, 0, -ccLen/2);
+            const cCarboxyPos = new THREE.Vector3(0, 0, ccLen/2);
+            let cMethyl = cMethylPos.clone();
+            let cCarboxy = cCarboxyPos.clone();
+            if (mirrorX) { cMethyl.x = -cMethyl.x; cCarboxy.x = -cCarboxy.x; }
+
+            const carbon1 = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 64), materials.carbon);
+            carbon1.position.copy(cMethyl); group.add(carbon1);
+            const carbon2 = new THREE.Mesh(new THREE.SphereGeometry(rC, 64, 64), materials.carbon);
+            carbon2.position.copy(cCarboxy); group.add(carbon2);
+
+            const ccBond = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * bondScale, 0.1 * bondScale, ccLen, 12), materials.bond);
+            ccBond.position.set(0,0,0);
+            ccBond.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,1));
+            group.add(ccBond);
+
+            const methylGroup = new THREE.Group();
+            methylGroup.position.copy(cMethyl);
+            const cos109 = -1/3, sin109 = Math.sqrt(1-cos109*cos109);
+            [0,120,240].forEach(angle => {
+                const rad = angle * Math.PI/180;
+                let x = sin109 * Math.cos(rad) * chLen;
+                let y = sin109 * Math.sin(rad) * chLen;
+                let z = cos109 * chLen;
+                if (mirrorX) x = -x;
+                const hPos = new THREE.Vector3(x,y,z);
+                const hAtom = new THREE.Mesh(new THREE.SphereGeometry(rH, 48,48), materials.hydrogen);
+                hAtom.position.copy(hPos);
+                methylGroup.add(hAtom);
+                const hBond = new THREE.Mesh(new THREE.CylinderGeometry(0.08*bondScale,0.08*bondScale, chLen,8), materials.bond);
+                hBond.position.copy(hPos.clone().multiplyScalar(0.5));
+                hBond.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), hPos.clone().normalize());
+                methylGroup.add(hBond);
+            });
+            methylGroup.rotation.z = methylRotationDeg * Math.PI/180;
+            group.add(methylGroup);
+
+            function rotY(vec, deg) {
+                const rad = deg*Math.PI/180;
+                const c=Math.cos(rad), s=Math.sin(rad);
+                return new THREE.Vector3(vec.x*c + vec.z*s, vec.y, -vec.x*s + vec.z*c);
+            }
+            const toC1 = new THREE.Vector3(0,0,-1);
+            let toO_carbonyl = rotY(toC1, 120);
+            let toO_hydroxy = rotY(toC1, -120);
+            if (mirrorX) { toO_carbonyl.x = -toO_carbonyl.x; toO_hydroxy.x = -toO_hydroxy.x; }
+            let oCarbonylPos = toO_carbonyl.clone().multiplyScalar(lenCO);
+            let oHydroxyPos = toO_hydroxy.clone().multiplyScalar(lenCOH);
+            oCarbonylPos = cCarboxy.clone().add(oCarbonylPos);
+            oHydroxyPos = cCarboxy.clone().add(oHydroxyPos);
+
+            const OtoC = cCarboxy.clone().sub(oHydroxyPos);
+            OtoC.y = 0; OtoC.normalize();
+            const angleRad = 120*Math.PI/180;
+            const OtoC_angle = Math.atan2(OtoC.z, OtoC.x);
+            const ohAngle1 = OtoC_angle + angleRad;
+            const ohAngle2 = OtoC_angle - angleRad;
+            const ohDir1 = new THREE.Vector3(Math.cos(ohAngle1),0,Math.sin(ohAngle1));
+            const ohDir2 = new THREE.Vector3(Math.cos(ohAngle2),0,Math.sin(ohAngle2));
+            const toCarbonyl = oCarbonylPos.clone().sub(oHydroxyPos);
+            toCarbonyl.y = 0; toCarbonyl.normalize();
+            let ohDir = (ohDir1.dot(toCarbonyl) > ohDir2.dot(toCarbonyl)) ? ohDir1 : ohDir2;
+            let hHydroxyPos = ohDir.clone().multiplyScalar(lenOH);
+            if (mirrorX) hHydroxyPos.x = -hHydroxyPos.x;
+            hHydroxyPos = oHydroxyPos.clone().add(hHydroxyPos);
+
+            const oxygenCarbonyl = new THREE.Mesh(new THREE.SphereGeometry(rO,64,64), materials.oxygen);
+            oxygenCarbonyl.position.copy(oCarbonylPos); group.add(oxygenCarbonyl);
+            const oxygenHydroxy = new THREE.Mesh(new THREE.SphereGeometry(rO,64,64), materials.oxygen);
+            oxygenHydroxy.position.copy(oHydroxyPos); group.add(oxygenHydroxy);
+            const hydrogenHydroxy = new THREE.Mesh(new THREE.SphereGeometry(rH,48,48), materials.hydrogen);
+            hydrogenHydroxy.position.copy(hHydroxyPos); group.add(hydrogenHydroxy);
+
+            let axisCO = toO_carbonyl.clone().normalize();
+            let perp = new THREE.Vector3(0,1,0).cross(axisCO);
+            if (perp.length()<0.1) perp = new THREE.Vector3(1,0,0).cross(axisCO);
+            perp.normalize();
+            const off = 0.12*bondScale;
+            const bondCO1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09*bondScale,0.09*bondScale, lenCO,12), materials.bond);
+            let co1Pos = cCarboxy.clone().add(toO_carbonyl.clone().multiplyScalar(lenCO*0.5));
+            bondCO1.position.copy(co1Pos.add(perp.clone().multiplyScalar(off)));
+            bondCO1.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), axisCO);
+            group.add(bondCO1);
+            const bondCO2 = new THREE.Mesh(new THREE.CylinderGeometry(0.09*bondScale,0.09*bondScale, lenCO,12), materials.bond);
+            let co2Pos = cCarboxy.clone().add(toO_carbonyl.clone().multiplyScalar(lenCO*0.5));
+            bondCO2.position.copy(co2Pos.sub(perp.clone().multiplyScalar(off)));
+            bondCO2.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), axisCO);
+            group.add(bondCO2);
+            const bondCOH = new THREE.Mesh(new THREE.CylinderGeometry(0.1*bondScale,0.1*bondScale, lenCOH,12), materials.bond);
+            let cohPos = cCarboxy.clone().add(toO_hydroxy.clone().multiplyScalar(lenCOH*0.5));
+            bondCOH.position.copy(cohPos);
+            bondCOH.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), toO_hydroxy.clone().normalize());
+            group.add(bondCOH);
+            const bondOH = new THREE.Mesh(new THREE.CylinderGeometry(0.08*bondScale,0.08*bondScale, lenOH,12), materials.bond);
+            let ohMid = oHydroxyPos.clone().add(hHydroxyPos.clone().sub(oHydroxyPos).multiplyScalar(0.5));
+            bondOH.position.copy(ohMid);
+            bondOH.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), hHydroxyPos.clone().sub(oHydroxyPos).normalize());
+            group.add(bondOH);
+            return group;
+        }
+
+        function getLocalPositions(methylRotationDeg, mirrorX) {
+            const bondScale = MOLECULE_SCALE;
+            const ccLen = 1.6 * bondScale;
+            const lenCO = 1.25 * bondScale;
+            const lenCOH = 1.36 * bondScale;
+            const localMethyl = new THREE.Vector3(0,0,-ccLen/2);
+            const localCarboxy = new THREE.Vector3(0,0,ccLen/2);
+            if (mirrorX) { localMethyl.x = -localMethyl.x; localCarboxy.x = -localCarboxy.x; }
+            function rotY(v,d){ const r=d*Math.PI/180; const c=Math.cos(r),s=Math.sin(r); return new THREE.Vector3(v.x*c+v.z*s, v.y, -v.x*s+v.z*c); }
+            const toC1 = new THREE.Vector3(0,0,-1);
+            let toCarbonyl = rotY(toC1,120);
+            let toHydroxy = rotY(toC1,-120);
+            if(mirrorX){ toCarbonyl.x = -toCarbonyl.x; toHydroxy.x = -toHydroxy.x; }
+            const localCarbonyl = localCarboxy.clone().add(toCarbonyl.multiplyScalar(lenCO));
+            const localHydroxy = localCarboxy.clone().add(toHydroxy.multiplyScalar(lenCOH));
+            return { localMethyl, localCarboxy, localCarbonyl, localHydroxy };
+        }
+
+        function placeByHydroxy(mol, lm, lh, lc, targetHydroxy, targetDirCenter) {
+            const qY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI/2);
+            const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), -Math.PI/2);
+            const initRot = qY.clone().multiply(qX);
+            mol.quaternion.copy(initRot);
+            mol.position.set(0,0,0);
+            const hydroxyWorld = lh.clone().applyQuaternion(initRot);
+            const methylWorld = lm.clone().applyQuaternion(initRot);
+            const dirOrig = methylWorld.clone().sub(hydroxyWorld).normalize();
+            const targetDir = targetDirCenter.clone().sub(targetHydroxy).normalize();
+            const align = new THREE.Quaternion().setFromUnitVectors(dirOrig, targetDir);
+            mol.quaternion.premultiply(align);
+            const newMethyl = lm.clone().applyQuaternion(mol.quaternion);
+            const newHydroxy = lh.clone().applyQuaternion(mol.quaternion);
+            const axis = newMethyl.clone().sub(newHydroxy).normalize();
+            const carbonylWorld = lc.clone().applyQuaternion(mol.quaternion);
+            const relCarbonyl = carbonylWorld.clone().sub(newHydroxy).normalize();
+            const proj = relCarbonyl.clone().sub(axis.clone().multiplyScalar(relCarbonyl.dot(axis))).normalize();
+            const upDir = new THREE.Vector3(0,1,0);
+            const projUp = upDir.clone().sub(axis.clone().multiplyScalar(upDir.dot(axis))).normalize();
+            const angle = Math.acos(Math.min(1,Math.max(-1, proj.dot(projUp))));
+            const cross = new THREE.Vector3().crossVectors(proj, projUp);
+            const sign = cross.dot(axis) > 0 ? 1 : -1;
+            const twist = new THREE.Quaternion().setFromAxisAngle(axis, angle * sign);
+            mol.quaternion.premultiply(twist);
+            const finalHydroxy = lh.clone().applyQuaternion(mol.quaternion);
+            mol.position.add(targetHydroxy.clone().sub(finalHydroxy));
+            return mol;
+        }
+
+        function placeByMethyl(mol, lm, lc, lcaron, targetMethyl, targetCarboxy) {
+            const qY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI/2);
+            const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), -Math.PI/2);
+            const initRot = qY.clone().multiply(qX);
+            mol.quaternion.copy(initRot);
+            const baseMethyl = lm.clone().applyQuaternion(initRot);
+            const baseCarboxy = lc.clone().applyQuaternion(initRot);
+            const dirCC = baseCarboxy.clone().sub(baseMethyl).normalize();
+            const targetDir = targetCarboxy.clone().sub(targetMethyl).normalize();
+            const align = new THREE.Quaternion().setFromUnitVectors(dirCC, targetDir);
+            mol.quaternion.premultiply(align);
+            const carbonylLocal = lcaron.clone().applyQuaternion(mol.quaternion);
+            const methylLocal = lm.clone().applyQuaternion(mol.quaternion);
+            const relCarbonyl = carbonylLocal.clone().sub(methylLocal).normalize();
+            const axisCC = targetDir.clone();
+            const projCurr = relCarbonyl.clone().sub(axisCC.clone().multiplyScalar(relCarbonyl.dot(axisCC))).normalize();
+            const downDir = new THREE.Vector3(0,-1,0);
+            const projDown = downDir.clone().sub(axisCC.clone().multiplyScalar(downDir.dot(axisCC))).normalize();
+            const ang = Math.acos(Math.min(1,Math.max(-1, projCurr.dot(projDown))));
+            const crossVec = new THREE.Vector3().crossVectors(projCurr, projDown);
+            const sgn = crossVec.dot(axisCC) > 0 ? 1 : -1;
+            const twist = new THREE.Quaternion().setFromAxisAngle(axisCC, ang * sgn);
+            mol.quaternion.premultiply(twist);
+            const finalMethyl = lm.clone().applyQuaternion(mol.quaternion);
+            mol.position.copy(targetMethyl.clone().sub(finalMethyl));
+            return mol;
+        }
+
+        // 存储所有分子组和它们的原始颜色
+        const allMolecules = [];
+        const originalColorsMap = new Map();
+
+        function registerMolecule(mol) {
+            allMolecules.push(mol);
+            mol.traverse(child => {
+                if (child.isMesh && child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(mat => {
+                        if (mat.color) {
+                            const key = child.uuid + '_' + mat.uuid;
+                            if (!originalColorsMap.has(key)) {
+                                originalColorsMap.set(key, mat.color.clone());
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // 创建复制分子1-4
+        const p1 = getLocalPositions(0, false);
+        const mol1 = createAceticAcid(0, false, makeMaterials());
+        placeByHydroxy(mol1, p1.localMethyl, p1.localHydroxy, p1.localCarbonyl, faceCenter647, center327);
+        scene.add(mol1); registerMolecule(mol1);
+
+        const p2 = getLocalPositions(180, false);
+        const mol2 = createAceticAcid(180, false, makeMaterials());
+        placeByHydroxy(mol2, p2.localMethyl, p2.localHydroxy, p2.localCarbonyl, faceCenter697, center377);
+        scene.add(mol2); registerMolecule(mol2);
+
+        const p3 = getLocalPositions(0, false);
+        const mol3 = createAceticAcid(0, false, makeMaterials());
+        placeByMethyl(mol3, p3.localMethyl, p3.localCarboxy, p3.localCarbonyl, center152, center349);
+        scene.add(mol3); registerMolecule(mol3);
+
+        const p4 = getLocalPositions(180, true);
+        const mol4 = createAceticAcid(180, true, makeMaterials());
+        placeByMethyl(mol4, p4.localMethyl, p4.localCarboxy, p4.localCarbonyl, center198, center396);
+        scene.add(mol4); registerMolecule(mol4);
+
+        // 样板分子
+        function createSample(methylDeg, mirror, cx, y, ang) {
+            const m = createAceticAcid(methylDeg, mirror, makeMaterials());
+            m.rotation.y = Math.PI/2;
+            m.rotation.x = -Math.PI/2;
+            const pivot = new THREE.Vector3(cx,0,0);
+            const axis = new THREE.Vector3(0,0,1);
+            const rad = ang * Math.PI/180;
+            m.position.set(cx,0,0);
+            m.position.sub(pivot);
+            m.rotateOnWorldAxis(axis, rad);
+            m.position.copy(pivot);
+            m.position.y = y;
+            return m;
+        }
+        const sampleY = 5.2;
+        const xs = [-5.2, -1.8, 1.8, 5.2];
+        const sample1 = createSample(0, false, xs[0], sampleY, 30);
+        const sample2 = createSample(180, false, xs[1], sampleY, 30);
+        const sample3 = createSample(0, true, xs[2], sampleY, -30);
+        const sample4 = createSample(180, true, xs[3], sampleY, -30);
+        scene.add(sample1); registerMolecule(sample1);
+        scene.add(sample2); registerMolecule(sample2);
+        scene.add(sample3); registerMolecule(sample3);
+        scene.add(sample4); registerMolecule(sample4);
+
+        // 单个分子变色函数
+        function setColorForMolecule(mol, colorHex) {
+            const targetColor = new THREE.Color(colorHex);
+            mol.traverse(child => {
+                if (child.isMesh && child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(mat => {
+                        if (mat.color) mat.color.copy(targetColor);
+                    });
+                }
+            });
+        }
+
+        // 恢复单个分子原始颜色
+        function resetMoleculeColor(mol) {
+            mol.traverse(child => {
+                if (child.isMesh && child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(mat => {
+                        if (mat.color) {
+                            for (let [key, origColor] of originalColorsMap.entries()) {
+                                if (key.startsWith(child.uuid)) {
+                                    mat.color.copy(origColor);
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        function resetAllColors() {
+            allMolecules.forEach(mol => resetMoleculeColor(mol));
+        }
+
+        // 选色板交互
+        let currentActiveColor = '#ff4444';
+        const colorBtns = document.querySelectorAll('.color-btn');
+        colorBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                colorBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const col = btn.dataset.color;
+                if (col === 'red') currentActiveColor = '#ff4444';
+                else if (col === 'green') currentActiveColor = '#44ff44';
+                else if (col === 'blue') currentActiveColor = '#4488ff';
+                else if (col === 'yellow') currentActiveColor = '#ffdd44';
+            });
+        });
+        document.querySelector('.color-btn[data-color="red"]').classList.add('active');
+
+        document.getElementById('resetColorsBtn').addEventListener('click', () => {
+            resetAllColors();
+        });
+
+        // =========================================================
+        // 拾取：射线优先，触屏再叠一层屏幕空间 fallback
+        // =========================================================
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        function doPickAndRecolor(clientX, clientY, pointerType) {
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+
+            const intersects = raycaster.intersectObjects(allMolecules, true);
+
+            let hitMol = null;
+            if (intersects.length > 0) {
+                let hit = intersects[0].object;
+                while (hit && !allMolecules.includes(hit)) hit = hit.parent;
+                if (hit && allMolecules.includes(hit)) hitMol = hit;
+            } else {
+                // 触屏 fallback：屏幕空间找最近的分子
+                const radius = pointerType === 'mouse' ? 24 : 50;
+                const v = new THREE.Vector3();
+                let best = null;
+                let bestDist = radius;
+                allMolecules.forEach(mol => {
+                    mol.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = mol; }
+                });
+                if (best) hitMol = best;
+            }
+
+            if (hitMol) {
+                setColorForMolecule(hitMol, currentActiveColor);
+            }
+        }
+
+        // =========================================================
+        // 触屏 / 鼠标 点击识别（只在 canvas 上，不干扰按钮）
+        // =========================================================
+        const activePointers = new Set();
+        let tapStart = null;
+
+        function moveThresholdFor(pointerType) {
+            return pointerType === 'mouse' ? 6 : 12;
+        }
+        const TAP_MAX_DURATION = 500;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                tapStart = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch'
+                };
+            } else {
+                tapStart = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!tapStart || activePointers.size !== 1) return;
+            const dx = e.clientX - tapStart.x;
+            const dy = e.clientY - tapStart.y;
+            const thr = moveThresholdFor(e.pointerType || tapStart.pointerType);
+            if (dx * dx + dy * dy > thr * thr) tapStart = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const pointerCountBeforeUp = activePointers.size;
+            if (tapStart && pointerCountBeforeUp === 1) {
+                const elapsed = performance.now() - tapStart.t;
+                const dx = e.clientX - tapStart.x;
+                const dy = e.clientY - tapStart.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const thr = moveThresholdFor(e.pointerType || tapStart.pointerType);
+                if (dist <= thr && elapsed <= TAP_MAX_DURATION) {
+                    doPickAndRecolor(e.clientX, e.clientY, e.pointerType || tapStart.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) tapStart = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            tapStart = null;
+        });
+
+        // iOS Safari 特有页面级双指缩放手势，禁止掉
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        // =========================================================
+        // ★ 横竖屏自动切换 ★
+        // =========================================================
+        const LANDSCAPE_CONFIG = {
+            pos: new THREE.Vector3(8, 6.5, 12),
+            target: new THREE.Vector3(0, 0, 0),
+            fov: 42,
+            maxZoom: 1.0
+        };
+        const PORTRAIT_CONFIG = {
+            pos: new THREE.Vector3(9, 8, 16),
+            target: new THREE.Vector3(0, 0.8, 0),
+            fov: 42,
+            maxZoom: 1.0
+        };
+
+        function computeZoom(cfg, aspect) {
+            const dist = cfg.pos.distanceTo(cfg.target);
+            const baseH = 2 * dist * Math.tan(THREE.MathUtils.degToRad(cfg.fov / 2));
+            const contentW = 13;   // 分子最宽处约 11.4 + 边距
+            const contentH = 11;   // 立方体 + 顶部样品分子高度约 10 + 边距
+            const zoomW = baseH * aspect / contentW;
+            const zoomH = baseH / contentH;
+            return Math.max(0.32, Math.min(cfg.maxZoom, zoomW, zoomH));
+        }
+
+        let camTween = null;
+
+        function setCameraTween(toPos, toTarget, toFov, toZoom, duration = 400) {
+            camTween = {
+                fromPos: camera.position.clone(),
+                toPos: toPos.clone(),
+                fromTarget: controls.target.clone(),
+                toTarget: toTarget.clone(),
+                fromFov: camera.fov,
+                toFov: toFov,
+                fromZoom: camera.zoom,
+                toZoom: toZoom,
+                start: performance.now(),
+                duration: duration
+            };
+        }
+
+        let currentOrientation = null;
+
+        function applyOrientationCamera(smooth = true) {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const aspect = window.innerWidth / window.innerHeight;
+            const orientationKey = isLandscape ? 'landscape' : 'portrait';
+            const cfg = isLandscape ? LANDSCAPE_CONFIG : PORTRAIT_CONFIG;
+            const zoom = computeZoom(cfg, aspect);
+
+            camera.aspect = aspect;
+
+            if (currentOrientation === orientationKey) {
+                camera.zoom = zoom;
+                camera.updateProjectionMatrix();
+                controls.update();
+                return;
+            }
+
+            currentOrientation = orientationKey;
+
+            if (smooth && camera.position.lengthSq() > 0) {
+                setCameraTween(cfg.pos, cfg.target, cfg.fov, zoom, 400);
+            } else {
+                camera.position.copy(cfg.pos);
+                controls.target.copy(cfg.target);
+                camera.fov = cfg.fov;
+                camera.zoom = zoom;
+                camera.updateProjectionMatrix();
+                camera.lookAt(controls.target);
+                controls.update();
+            }
+        }
+
+        // 初始化
+        applyOrientationCamera(false);
+
+        let resizeTimer = null;
+        function scheduleOrientationUpdate() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                applyOrientationCamera(true);
+            }, 60);
+        }
+        window.addEventListener('resize', scheduleOrientationUpdate);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(scheduleOrientationUpdate, 300);
+        });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', scheduleOrientationUpdate);
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (camTween) {
+                const t = Math.min(1, (performance.now() - camTween.start) / camTween.duration);
+                const e = t * t * (3 - 2 * t); // smoothstep
+                camera.position.lerpVectors(camTween.fromPos, camTween.toPos, e);
+                controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, e);
+                camera.fov = camTween.fromFov + (camTween.toFov - camTween.fromFov) * e;
+                camera.zoom = camTween.fromZoom + (camTween.toZoom - camTween.fromZoom) * e;
+                camera.updateProjectionMatrix();
+                camera.lookAt(controls.target);
+                if (t >= 1) camTween = null;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        console.log('✅ 场景已加载 | 触屏/鼠标点击仅该分子变色 | 横竖屏自适应');
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

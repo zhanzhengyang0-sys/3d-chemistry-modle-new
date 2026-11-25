@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[Cu(NH3)4]2+ 缩小版</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #caption {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            text-align: center;
+            color: #333;
+            font-size: 20px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+    </style>
+    <script src="libs/three.min.js"></script>
+    <script src="libs/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="caption">四氨合铜 [Cu(NH₃)₄]²⁺</div>
+
+    <script>
+        // --- 1. 场景与渲染器 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // 【修改】稍微拉远相机，使图形看起来变小了一点点
+        camera.position.set(10, 7.5, 10); 
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = false;
+        controls.target.set(0, 0, 0);
+
+        // --- 2. 光线 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6)); 
+        const light = new THREE.DirectionalLight(0xffffff, 0.8); 
+        light.position.set(10, 15, 10);
+        scene.add(light);
+
+        // --- 3. 几何与材质参数 ---
+        const R_Cu_N = 2.4;  
+        const R_N_H = 1.45; // 与四水合铜的 O-H 键长一致
+        
+        const radiusCu = 0.85;
+        const radiusN = 0.7;
+        const radiusH = 0.45; 
+
+        const bondR = 0.08;
+        
+        // 颜色配置
+        const colCu = 0x800080;    // 紫色
+        const colN = 0xFFD700;     // 明黄色
+        const colH = 0xADD8E6;     // 亮天蓝色
+        const colBond = 0xaaaaaa;  // 中浅灰
+
+        const matSphere = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.25, metalness: 0.15 });
+        const matBond = new THREE.MeshStandardMaterial({ color: colBond, roughness: 0.5 });
+
+        function makeSphere(pos, radius, color) {
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 32), matSphere(color));
+            mesh.position.set(pos.x, pos.y, pos.z);
+            return mesh;
+        }
+
+        function makeBond(from, to) {
+            const start = new THREE.Vector3(from.x, from.y, from.z);
+            const end = new THREE.Vector3(to.x, to.y, to.z);
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const length = dir.length();
+            const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(bondR, bondR, length, 8), matBond);
+            mesh.position.copy(mid);
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            return mesh;
+        }
+
+        // 氮的三氢四面体算法
+        function calcTetra3H(N_pos, dirToCu, rotAngle) {
+            const N_vec = new THREE.Vector3(N_pos.x, N_pos.y, N_pos.z);
+            const axis = new THREE.Vector3(dirToCu.x, dirToCu.y, dirToCu.z).normalize();
+            const outward = axis.clone().multiplyScalar(-1);
+
+            let perp = new THREE.Vector3(1, 0, 0);
+            if (Math.abs(axis.dot(perp)) > 0.99) perp.set(0, 1, 0);
+            perp.cross(axis).normalize();
+
+            const coneAngle = 109.47 * Math.PI / 180;
+            const halfAngle = coneAngle / 2;
+
+            const quat1 = new THREE.Quaternion().setFromAxisAngle(axis, rotAngle);
+            const quat2 = new THREE.Quaternion().setFromAxisAngle(axis, rotAngle + (2 * Math.PI / 3));
+            const quat3 = new THREE.Quaternion().setFromAxisAngle(axis, rotAngle + (4 * Math.PI / 3));
+
+            const baseVec = perp.clone().multiplyScalar(Math.sin(halfAngle))
+                               .add(outward.clone().multiplyScalar(Math.cos(halfAngle))).normalize();
+
+            const dir1 = baseVec.clone().applyQuaternion(quat1).normalize();
+            const dir2 = baseVec.clone().applyQuaternion(quat2).normalize();
+            const dir3 = baseVec.clone().applyQuaternion(quat3).normalize();
+
+            return {
+                h1: N_vec.clone().add(dir1.clone().multiplyScalar(R_N_H)),
+                h2: N_vec.clone().add(dir2.clone().multiplyScalar(R_N_H)),
+                h3: N_vec.clone().add(dir3.clone().multiplyScalar(R_N_H))
+            };
+        }
+
+        // --- 4. 坐标计算 ---
+        const Cu_abs = {x:0, y:0, z:0};
+        const N_up_abs = {x:0, y:R_Cu_N, z:0};
+        const N_down_abs = {x:0, y:-R_Cu_N, z:0};
+        const N_left_abs = {x:-R_Cu_N, y:0, z:0};
+        const N_right_abs = {x:R_Cu_N, y:0, z:0};
+
+        // 【保持】针对 N1 和 N4 应用 180度 旋转
+        const H_up_abs = calcTetra3H(N_up_abs, {x:0, y:-1, z:0}, Math.PI);
+        const H_down_abs = calcTetra3H(N_down_abs, {x:0, y:1, z:0}, 1.0);
+        const H_left_abs = calcTetra3H(N_left_abs, {x:1, y:0, z:0}, 2.0);
+        const H_right_abs = calcTetra3H(N_right_abs, {x:-1, y:0, z:0}, 3.0 + Math.PI);
+
+        function rotateToHorizontal(p) {
+            return { x: p.x, y: p.z, z: -p.y };
+        }
+
+        const Cu = rotateToHorizontal(Cu_abs);
+        const N_up = rotateToHorizontal(N_up_abs);
+        const N_down = rotateToHorizontal(N_down_abs);
+        const N_left = rotateToHorizontal(N_left_abs);
+        const N_right = rotateToHorizontal(N_right_abs);
+        
+        const H_up = { h1: rotateToHorizontal(H_up_abs.h1), h2: rotateToHorizontal(H_up_abs.h2), h3: rotateToHorizontal(H_up_abs.h3) };
+        const H_down = { h1: rotateToHorizontal(H_down_abs.h1), h2: rotateToHorizontal(H_down_abs.h2), h3: rotateToHorizontal(H_down_abs.h3) };
+        const H_left = { h1: rotateToHorizontal(H_left_abs.h1), h2: rotateToHorizontal(H_left_abs.h2), h3: rotateToHorizontal(H_left_abs.h3) };
+        const H_right = { h1: rotateToHorizontal(H_right_abs.h1), h2: rotateToHorizontal(H_right_abs.h2), h3: rotateToHorizontal(H_right_abs.h3) };
+
+        // --- 5. 渲染模型 ---
+        scene.add(makeSphere(Cu, radiusCu, colCu)); 
+        [N_up, N_down, N_left, N_right].forEach(o => scene.add(makeSphere(o, radiusN, colN)));
+        
+        const allH = [H_up.h1, H_up.h2, H_up.h3, H_down.h1, H_down.h2, H_down.h3, H_left.h1, H_left.h2, H_left.h3, H_right.h1, H_right.h2, H_right.h3];
+        allH.forEach(h => scene.add(makeSphere(h, radiusH, colH)));
+
+        [N_up, N_down, N_left, N_right].forEach(o => scene.add(makeBond(Cu, o))); // Cu-N
+
+        scene.add(makeBond(N_up, H_up.h1)); scene.add(makeBond(N_up, H_up.h2)); scene.add(makeBond(N_up, H_up.h3));
+        scene.add(makeBond(N_down, H_down.h1)); scene.add(makeBond(N_down, H_down.h2)); scene.add(makeBond(N_down, H_down.h3));
+        scene.add(makeBond(N_left, H_left.h1)); scene.add(makeBond(N_left, H_left.h2)); scene.add(makeBond(N_left, H_left.h3));
+        scene.add(makeBond(N_right, H_right.h1)); scene.add(makeBond(N_right, H_right.h2)); scene.add(makeBond(N_right, H_right.h3));
+
+        // --- 6. 渲染循环 ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

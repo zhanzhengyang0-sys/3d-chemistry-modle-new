@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>二聚氯化铝 Al₂Cl₆ · 3D 球棍模型</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #ffffff;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            touch-action: none;
+        }
+        #info {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            padding: 8px 20px;
+            border-radius: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            font-size: 13px;
+            color: #333;
+            z-index: 100;
+            white-space: nowrap;
+        }
+        #legend {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.92);
+            padding: 6px 18px;
+            border-radius: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            font-size: 12px;
+            color: #444;
+            z-index: 100;
+            display: flex;
+            gap: 16px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">二聚氯化铝 Al₂Cl₆ · 球棍模型</div>
+    <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#7f8c8d;"></div>Al</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#16a085;"></div>Cl</div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        // --- 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 3.5, 6);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        // --- 控制器 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.target.set(0, 0, 0);
+
+        // --- 光照 ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        const d1 = new THREE.DirectionalLight(0xffffff, 0.9);
+        d1.position.set(5, 8, 6);
+        scene.add(d1);
+        const d2 = new THREE.DirectionalLight(0xccddff, 0.5);
+        d2.position.set(-5, -3, -6);
+        scene.add(d2);
+        const d3 = new THREE.DirectionalLight(0xffeecc, 0.4);
+        d3.position.set(2, -6, 4);
+        scene.add(d3);
+
+        // --- 材质 ---
+        const alMat   = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.3, metalness: 0.15 });
+        const clMat   = new THREE.MeshStandardMaterial({ color: 0x16a085, roughness: 0.45, metalness: 0.05 });
+        const bondMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.6, metalness: 0.0, transparent: true, opacity: 0.98 });
+
+        // --- 分组 ---
+        const rootGroup = new THREE.Group();
+        scene.add(rootGroup);
+
+        const atomGroup = new THREE.Group();
+        const bondGroup = new THREE.Group();
+        rootGroup.add(atomGroup);
+        rootGroup.add(bondGroup);
+
+        // --- 辅助函数 ---
+        function addSphere(pos, radius, material) {
+            const m = new THREE.Mesh(new THREE.SphereGeometry(radius, 28, 18), material);
+            m.position.copy(pos);
+            atomGroup.add(m);
+            return m;
+        }
+
+        function makeBond(start, end, radius, material) {
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const len = dir.length();
+            if (len < 0.001) return null;
+            const cyl = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 10), material);
+            cyl.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            bondGroup.add(cyl);
+            return cyl;
+        }
+
+        // ============================================================
+        // Al₂Cl₆ 几何布局（局部坐标）
+        // Al₂Cl₂ 四元环：xy 平面
+        // 4 个端基 Cl：yz 平面，两面互相垂直
+        // ============================================================
+
+        const alRadius   = 0.30;
+        const clRadius   = 0.24;
+        const bondRadius = 0.055;
+
+        const h  = 0.90;
+        const w  = 0.85;
+        const y1 = h + 0.75;
+        const z1 = 0.92;
+
+        const al1 = new THREE.Vector3(0,  h, 0);
+        const al2 = new THREE.Vector3(0, -h, 0);
+
+        const clB1 = new THREE.Vector3( w, 0, 0);
+        const clB2 = new THREE.Vector3(-w, 0, 0);
+
+        const clT1a = new THREE.Vector3(0,  y1,  z1);
+        const clT1b = new THREE.Vector3(0,  y1, -z1);
+        const clT2a = new THREE.Vector3(0, -y1,  z1);
+        const clT2b = new THREE.Vector3(0, -y1, -z1);
+
+        // --- 放置 Al ---
+        addSphere(al1, alRadius, alMat);
+        addSphere(al2, alRadius, alMat);
+
+        // --- 放置桥 Cl ---
+        addSphere(clB1, clRadius, clMat);
+        addSphere(clB2, clRadius, clMat);
+
+        // --- 放置端基 Cl ---
+        addSphere(clT1a, clRadius, clMat);
+        addSphere(clT1b, clRadius, clMat);
+        addSphere(clT2a, clRadius, clMat);
+        addSphere(clT2b, clRadius, clMat);
+
+        // --- 连接键 ---
+        makeBond(al1, clB1, bondRadius, bondMat);
+        makeBond(al1, clB2, bondRadius, bondMat);
+        makeBond(al2, clB1, bondRadius, bondMat);
+        makeBond(al2, clB2, bondRadius, bondMat);
+
+        makeBond(al1, clT1a, bondRadius, bondMat);
+        makeBond(al1, clT1b, bondRadius, bondMat);
+
+        makeBond(al2, clT2a, bondRadius, bondMat);
+        makeBond(al2, clT2b, bondRadius, bondMat);
+
+        // ============================================================
+        // 初始姿态：
+        //  1) 绕 x 轴 90° → Al₂Cl₂ 四元环平放（xz 平面）
+        //  2) 绕世界 y 轴 90° → 桥连方向从左右变成前后
+        //  3) 再绕世界 y 轴 30° → 整体左转更多
+        // ============================================================
+        rootGroup.rotateX(Math.PI / 2);
+        rootGroup.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+        rootGroup.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 6);  // 30° 左转
+
+        // --- 动画 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 窗口自适应 ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

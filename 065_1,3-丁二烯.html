@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>1,3-丁二烯 · 点击 H 换成彩球 · 旋转/隐藏</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #ffffff;
+            touch-action: none;
+            position: fixed;
+            width: 100%; height: 100%;
+            -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        canvas { display: block; touch-action: none; }
+
+        /* 顶部提示 */
+        #touch-hint {
+            position: absolute;
+            top: max(14px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            padding: 6px 16px;
+            border-radius: 30px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            color: #555;
+            z-index: 100;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+            max-width: calc(100vw - 24px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ============================================================
+           底部控制面板：flex-wrap 自动换行，窄屏完整可见
+           ============================================================ */
+        #bottom-controls {
+            position: absolute;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            z-index: 200;
+            pointer-events: none;
+        }
+
+        .control-card {
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid #888;
+            border-left: 4px solid #2c5a8c;
+            border-radius: 22px;
+            padding: 8px 14px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 8px 12px;
+            pointer-events: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-sizing: border-box;
+        }
+
+        /* 颜色选择器 */
+        .color-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+        .picker-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            white-space: nowrap;
+        }
+        .color-dots {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .color-dot {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.9);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: transform 0.12s, box-shadow 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        .color-dot:active { transform: scale(0.88); }
+        .color-dot.active {
+            border: 3px solid #1a1a1a;
+            transform: scale(1.12);
+            box-shadow: 0 0 0 2px #ffd966;
+        }
+
+        .divider { width: 1px; height: 28px; background: #ccc; flex-shrink: 0; }
+
+        /* 旋转滑块 */
+        .slider-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 0 0 auto;
+            min-width: 0;
+        }
+        .slider-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #1a2a3a;
+            font-size: 12px;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+        .slider-label span:first-child { color: #2c5a8c; }
+
+        #rot-slider {
+            width: 200px;
+            height: 4px;
+            background: #ccc;
+            border-radius: 10px;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            flex-shrink: 0;
+            touch-action: none;
+            outline: none;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+        }
+        #rot-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #2c5a8c;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(44,90,140,0.4);
+            cursor: grab;
+            transition: transform 0.1s;
+        }
+        #rot-slider::-webkit-slider-thumb:active { transform: scale(1.15); }
+        #rot-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #2c5a8c;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            cursor: grab;
+        }
+
+        #angle-value {
+            min-width: 50px;
+            color: #2c5a8c;
+            font-weight: 700;
+            font-size: 13px;
+            text-align: center;
+            background: #f0f0f0;
+            padding: 3px 10px;
+            border-radius: 24px;
+            border: 1px solid #2c5a8c;
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 显示/隐藏按钮 */
+        .action-btn {
+            background: rgba(240, 240, 240, 0.85);
+            border: 1px solid #aaa;
+            color: #1a2a3a;
+            padding: 0 16px;
+            height: 34px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            pointer-events: auto;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            flex-shrink: 0;
+        }
+        .action-btn:hover { background: #ffffff; border-color: #2c5a8c; }
+        .action-btn:active { transform: scale(0.96); }
+        .btn-icon { font-size: 15px; }
+
+        /* ============================================================
+           触屏设备（粗指针）: 加大点击目标和滑块
+           ============================================================ */
+        @media (pointer: coarse) {
+            .color-dot { width: 34px; height: 34px; }
+            #rot-slider { height: 8px; }
+            #rot-slider::-webkit-slider-thumb { width: 26px; height: 26px; }
+            #rot-slider::-moz-range-thumb     { width: 26px; height: 26px; }
+            #angle-value { font-size: 13px; padding: 4px 12px; min-width: 56px; }
+            .action-btn { height: 38px; font-size: 14px; padding: 0 18px; }
+            .control-card { padding: 10px 14px; }
+        }
+
+        /* ============================================================
+           窄屏: 控制面板铺满宽度、颜色/滑块/按钮各占一行
+           ============================================================ */
+        @media (max-width: 720px) {
+            #bottom-controls { width: calc(100vw - 16px); }
+            .control-card {
+                width: 100%;
+                padding: 10px 12px;
+                gap: 8px;
+                border-radius: 18px;
+            }
+            .color-picker {
+                width: 100%;
+                justify-content: center;
+                padding-bottom: 8px;
+                border-bottom: 1px solid #eee;
+            }
+            .color-dots { gap: 8px; }
+            .divider { display: none; }
+            .slider-section { width: 100%; }
+            #rot-slider { flex: 1; min-width: 60px; }
+            .action-btn { width: 100%; justify-content: center; height: 38px; }
+            #touch-hint { font-size: 11px; padding: 4px 12px; top: 12px; }
+        }
+
+        @media (max-width: 420px) {
+            .control-card { padding: 8px 10px; gap: 6px; }
+            .color-dot { width: 28px; height: 28px; }
+            .color-dots { gap: 6px; }
+            .slider-label { font-size: 11px; }
+            #angle-value { font-size: 11px; min-width: 44px; padding: 3px 8px; }
+            .action-btn { font-size: 12px; height: 34px; }
+        }
+    </style>
+    </head>
+<body>
+    <div id="touch-hint">👆 点击氢原子 → 变为所选颜色球 · 再点变回氢</div>
+
+    <div id="bottom-controls">
+        <div class="control-card">
+            <div class="color-picker">
+                <span class="picker-label">H →</span>
+                <div class="color-dots">
+                    <div class="color-dot active" data-color="red"    title="红色" style="background:#ff4444;"></div>
+                    <div class="color-dot" data-color="yellow" title="黄色" style="background:#ffcc00;"></div>
+                    <div class="color-dot" data-color="green"  title="绿色" style="background:#44dd88;"></div>
+                    <div class="color-dot" data-color="blue"   title="蓝色" style="background:#2196f3;"></div>
+                    <div class="color-dot" data-color="purple" title="紫色" style="background:#9b59b6;"></div>
+                    <div class="color-dot" data-color="black"  title="黑色" style="background:#000000;"></div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="slider-section">
+                <div class="slider-label">
+                    <span>🔁</span>
+                    <span>固定 — 旋转</span>
+                </div>
+                <input type="range" id="rot-slider" min="-180" max="180" value="0" step="1">
+                <span id="angle-value">0°</span>
+            </div>
+
+            <div class="divider"></div>
+
+            <button class="action-btn" id="toggleBtn">
+                <span class="btn-icon">⚛️</span>
+                <span id="toggleBtnText">隐藏氢/彩球</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+<script src="libs/OrbitControls.js"></script>
+<script src="libs/CSS2DRenderer.js"></script>
+<script>window.OrbitControls=THREE.OrbitControls;window.CSS2DRenderer=THREE.CSS2DRenderer;window.CSS2DObject=THREE.CSS2DObject;</script>
+<script>window.addEventListener('error',function(e){document.documentElement.setAttribute('data-jserr',String(e.message).slice(0,120))},true);</script>
+<script>
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // --- 几何参数（保持原值） ---
+        const bondLengthCC = 1.34 * 2.2;
+        const bondLengthC_C = 1.48 * 2.2;
+        const bondLengthCH = 1.09 * 2.2;
+        const angle120 = (120 * Math.PI) / 180;
+
+        function rotateY(vec, rad) {
+            return new THREE.Vector3(
+                vec.x * Math.cos(rad) + vec.z * Math.sin(rad),
+                0,
+                -vec.x * Math.sin(rad) + vec.z * Math.cos(rad)
+            );
+        }
+
+        const c2_fixed = new THREE.Vector3(0, 0, -bondLengthC_C / 2);
+        const vDirC2C1 = rotateY(new THREE.Vector3(0, 0, 1), angle120).normalize();
+        const c1_fixed = c2_fixed.clone().add(vDirC2C1.clone().multiplyScalar(bondLengthCC));
+
+        const vC1C2_fixed = new THREE.Vector3().subVectors(c2_fixed, c1_fixed).normalize();
+        const h1Dir_fixed = rotateY(vC1C2_fixed, angle120).normalize();
+        const h2Dir_fixed = rotateY(vC1C2_fixed, -angle120).normalize();
+        const h1_fixed = c1_fixed.clone().add(h1Dir_fixed.multiplyScalar(bondLengthCH));
+        const h2_fixed = c1_fixed.clone().add(h2Dir_fixed.multiplyScalar(bondLengthCH));
+
+        const vC2C1_fixed = new THREE.Vector3().subVectors(c1_fixed, c2_fixed).normalize();
+        const vC2C3_dir = new THREE.Vector3(0, 0, 1);
+        const vC2H_fixed = new THREE.Vector3().addVectors(vC2C1_fixed, vC2C3_dir).negate().normalize();
+        const h5_fixed = c2_fixed.clone().add(vC2H_fixed.multiplyScalar(bondLengthCH));
+
+        const c3_base = new THREE.Vector3(0, 0, bondLengthC_C / 2);
+        const c4_base = c1_fixed.clone().negate();
+
+        const h3_base = h1_fixed.clone().negate();
+        const h4_base = h2_fixed.clone().negate();
+
+        const vC3C2 = new THREE.Vector3().subVectors(c2_fixed, c3_base).normalize();
+        const vC3C4 = new THREE.Vector3().subVectors(c4_base, c3_base).normalize();
+        const vC3H_base = new THREE.Vector3().addVectors(vC3C2, vC3C4).negate().normalize();
+        const h6_base = c3_base.clone().add(vC3H_base.multiplyScalar(bondLengthCH));
+
+        // ============================================================
+        // 原子半径（保持 C=0.7, H=0.45 原值；彩球 0.55，比 H 稍大、比 C 小）
+        // ============================================================
+        const RADII = { C: 0.70, H: 0.45, colored: 0.55 };
+
+        // --- 材质 ---
+        const carbonMat = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            roughness: 0.15,
+            metalness: 0.3,
+            emissive: 0x000000,
+            emissiveIntensity: 0.0
+        });
+        const hydrogenMat = new THREE.MeshStandardMaterial({
+            color: 0x3366aa,
+            roughness: 0.15,
+            metalness: 0.2,
+            emissive: 0x000000
+        });
+        const singleBondMat = new THREE.MeshStandardMaterial({
+            color: 0x555555, roughness: 0.3, metalness: 0.1
+        });
+        const doubleBondMat = new THREE.MeshStandardMaterial({
+            color: 0x666666, roughness: 0.25, metalness: 0.1
+        });
+
+        // 6 色材质
+        const COLOR_VALUES = {
+            red:    0xff4444,
+            yellow: 0xffcc00,
+            green:  0x44dd88,
+            blue:   0x2196f3,
+            purple: 0x9b59b6,
+            black:  0x000000
+        };
+        const coloredMaterials = {};
+        Object.keys(COLOR_VALUES).forEach(key => {
+            coloredMaterials[key] = new THREE.MeshStandardMaterial({
+                color: COLOR_VALUES[key],
+                roughness: 0.15,
+                metalness: 0.2
+            });
+        });
+
+        const carbonGeo = new THREE.SphereGeometry(RADII.C, 64, 32);
+        const hydrogenGeo = new THREE.SphereGeometry(RADII.H, 48, 24);
+        const coloredGeo = new THREE.SphereGeometry(RADII.colored, 48, 24);
+
+        // 通用：创建圆柱键
+        function createBond(start, end, material, radius = 0.12, segments = 12) {
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const length = dir.length();
+            const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            const geo = new THREE.CylinderGeometry(radius, radius, 1, segments);
+            const cyl = new THREE.Mesh(geo, material);
+            cyl.scale.set(1, length, 1);
+            cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+            cyl.position.copy(mid);
+            return cyl;
+        }
+
+        // ============================================================
+        // 可替换原子管理
+        //   record = { mesh, bond, parent, pos, cPos, type, colorKey }
+        // ============================================================
+        const clickableAtoms = [];
+        const switchableAtoms = [];
+
+        function createAtomRecord(type, parent, pos, cPos) {
+            let mesh;
+            if (type === 'H') {
+                mesh = new THREE.Mesh(hydrogenGeo, hydrogenMat);
+            } else {
+                mesh = new THREE.Mesh(coloredGeo, coloredMaterials[type]);
+            }
+            mesh.position.copy(pos);
+            parent.add(mesh);
+            clickableAtoms.push(mesh);
+
+            const bond = createBond(cPos, pos, singleBondMat, 0.12, 12);
+            parent.add(bond);
+
+            const record = {
+                mesh, bond, parent,
+                pos: pos.clone(),
+                cPos: cPos.clone(),
+                type,
+                colorKey: type === 'H' ? null : type
+            };
+            switchableAtoms.push(record);
+            return record;
+        }
+
+        function swapAtom(record, newType, colorKey) {
+            const { parent, pos, cPos } = record;
+
+            parent.remove(record.mesh);
+            parent.remove(record.bond);
+
+            const ci = clickableAtoms.indexOf(record.mesh);
+            if (ci > -1) clickableAtoms.splice(ci, 1);
+
+            let newMesh;
+            if (newType === 'H') {
+                newMesh = new THREE.Mesh(hydrogenGeo, hydrogenMat);
+            } else {
+                newMesh = new THREE.Mesh(coloredGeo, coloredMaterials[colorKey]);
+            }
+            newMesh.position.copy(pos);
+            parent.add(newMesh);
+            clickableAtoms.push(newMesh);
+
+            const newBond = createBond(cPos, pos, singleBondMat, 0.12, 12);
+            parent.add(newBond);
+
+            record.mesh = newMesh;
+            record.bond = newBond;
+            record.type = newType;
+            record.colorKey = newColorKeyOrNull(newType, colorKey);
+
+            // 保持当前隐藏状态
+            if (isHidden) {
+                newMesh.visible = false;
+                newBond.visible = false;
+            }
+        }
+        function newColorKeyOrNull(newType, colorKey) {
+            return newType === 'H' ? null : colorKey;
+        }
+
+        // ============================================================
+        // 左侧（固定）部分
+        // ============================================================
+        const leftGroup = new THREE.Group();
+        scene.add(leftGroup);
+
+        const c1Atom = new THREE.Mesh(carbonGeo, carbonMat);
+        c1Atom.position.copy(c1_fixed);
+        leftGroup.add(c1Atom);
+
+        const c2Atom = new THREE.Mesh(carbonGeo, carbonMat);
+        c2Atom.position.copy(c2_fixed);
+        leftGroup.add(c2Atom);
+
+        // 双键 C1=C2（两条平行圆柱）
+        const offsetY = 0.25;
+        const bond12a = createBond(c1_fixed, c2_fixed, doubleBondMat, 0.14, 16);
+        bond12a.position.y = offsetY;
+        leftGroup.add(bond12a);
+        const bond12b = createBond(c1_fixed, c2_fixed, doubleBondMat, 0.14, 16);
+        bond12b.position.y = -offsetY;
+        leftGroup.add(bond12b);
+
+        // 左侧 3 个 H
+        createAtomRecord('H', leftGroup, h1_fixed, c1_fixed);
+        createAtomRecord('H', leftGroup, h2_fixed, c1_fixed);
+        createAtomRecord('H', leftGroup, h5_fixed, c2_fixed);
+
+        // ============================================================
+        // 右侧（可旋转）部分
+        // ============================================================
+        const rightGroup = new THREE.Group();
+        scene.add(rightGroup);
+
+        const c3Atom = new THREE.Mesh(carbonGeo, carbonMat);
+        c3Atom.position.copy(c3_base);
+        rightGroup.add(c3Atom);
+
+        const c4Atom = new THREE.Mesh(carbonGeo, carbonMat);
+        c4Atom.position.copy(c4_base);
+        rightGroup.add(c4Atom);
+
+        // 双键 C3=C4
+        const bond34a = createBond(c3_base, c4_base, doubleBondMat, 0.14, 16);
+        bond34a.position.y = offsetY;
+        rightGroup.add(bond34a);
+        const bond34b = createBond(c3_base, c4_base, doubleBondMat, 0.14, 16);
+        bond34b.position.y = -offsetY;
+        rightGroup.add(bond34b);
+
+        // 右侧 3 个 H
+        createAtomRecord('H', rightGroup, h6_base, c3_base);   // C3 上的 H
+        createAtomRecord('H', rightGroup, h3_base, c4_base);   // C4 上的 H3
+        createAtomRecord('H', rightGroup, h4_base, c4_base);   // C4 上的 H4
+
+        // --- 中间 C2-C3 单键 ---
+        const centralBond = createBond(c2_fixed, c3_base, singleBondMat, 0.15, 16);
+        scene.add(centralBond);
+
+        // ============================================================
+        // 光照（保留原 6 个光源）
+        // ============================================================
+        scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.5);
+        light1.position.set(5, 10, 7);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffffff, 1.0);
+        light2.position.set(-5, -2, -5);
+        scene.add(light2);
+
+        const pointLight1 = new THREE.PointLight(0xffffff, 0.8);
+        pointLight1.position.set(0, 3, 10);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xffffff, 0.6);
+        pointLight2.position.set(0, 2, -8);
+        scene.add(pointLight2);
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
+        scene.add(hemiLight);
+
+        // ============================================================
+        // 相机 + 控制器
+        // ============================================================
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+        camera.position.set(8, 5, 14);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.4;
+        renderer.domElement.style.touchAction = 'none';
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.rotateSpeed = 0.8;
+        controls.maxPolarAngle = Math.PI * 0.99;
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        controls.update();
+
+        // ============================================================
+        // 旋转滑块
+        // ============================================================
+        const slider = document.getElementById('rot-slider');
+        const angleSpan = document.getElementById('angle-value');
+
+        function applyRotation(deg) {
+            angleSpan.textContent = deg + '°';
+            rightGroup.rotation.z = deg * Math.PI / 180;
+        }
+        slider.addEventListener('input', (e) => applyRotation(parseInt(e.target.value)));
+        slider.addEventListener('change', (e) => applyRotation(parseInt(e.target.value)));
+
+        // ============================================================
+        // 显示/隐藏切换
+        // ============================================================
+        let isHidden = false;
+        const toggleBtn = document.getElementById('toggleBtn');
+        const toggleBtnText = document.getElementById('toggleBtnText');
+
+        function applyVisibility() {
+            switchableAtoms.forEach(rec => {
+                rec.mesh.visible = !isHidden;
+                rec.bond.visible = !isHidden;
+            });
+            toggleBtnText.textContent = isHidden ? '显示氢/彩球' : '隐藏氢/彩球';
+        }
+        toggleBtn.addEventListener('click', () => {
+            isHidden = !isHidden;
+            applyVisibility();
+        });
+
+        // ============================================================
+        // 颜色选择器
+        // ============================================================
+        let selectedColorKey = 'red';
+        const colorDots = document.querySelectorAll('.color-dot');
+        colorDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                selectedColorKey = dot.dataset.color;
+                colorDots.forEach(d => d.classList.remove('active'));
+                dot.classList.add('active');
+            });
+        });
+
+        // ============================================================
+        // 拾取：射线优先，触屏 45px 屏幕空间 fallback
+        // ============================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function doPick(clientX, clientY, pointerType) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            // 只在可见的可点击原子中拾取
+            const visibleClickable = clickableAtoms.filter(a => a.visible);
+            const intersects = raycaster.intersectObjects(visibleClickable, false);
+
+            let hitMesh = null;
+            if (intersects.length > 0) {
+                hitMesh = intersects[0].object;
+            } else if (pointerType !== 'mouse') {
+                // 触屏 fallback：屏幕空间 45px 内最近的可点击原子
+                const v = new THREE.Vector3();
+                let best = null, bestDist = 45;
+                visibleClickable.forEach(atom => {
+                    atom.getWorldPosition(v);
+                    v.project(camera);
+                    if (v.z < -1 || v.z > 1) return;
+                    const sx = (v.x + 1) * 0.5 * window.innerWidth;
+                    const sy = (-v.y + 1) * 0.5 * window.innerHeight;
+                    const d = Math.sqrt((sx - clientX) ** 2 + (sy - clientY) ** 2);
+                    if (d < bestDist) { bestDist = d; best = atom; }
+                });
+                if (best) hitMesh = best;
+            }
+
+            if (!hitMesh) return;
+
+            const record = switchableAtoms.find(r => r.mesh === hitMesh);
+            if (!record) return;
+
+            if (record.type === 'H') {
+                swapAtom(record, 'colored', selectedColorKey);
+            } else {
+                swapAtom(record, 'H');
+            }
+        }
+
+        // ============================================================
+        // 触屏 / 鼠标 点击识别（三段式）
+        // ============================================================
+        const activePointers = new Set();
+        let pointerDownInfo = null;
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.add(e.pointerId);
+            if (activePointers.size === 1) {
+                pointerDownInfo = {
+                    x: e.clientX, y: e.clientY,
+                    t: performance.now(),
+                    pointerType: e.pointerType || 'touch',
+                    id: e.pointerId
+                };
+            } else {
+                pointerDownInfo = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (!pointerDownInfo || pointerDownInfo.id !== e.pointerId || activePointers.size !== 1) return;
+            const dx = e.clientX - pointerDownInfo.x;
+            const dy = e.clientY - pointerDownInfo.y;
+            const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+            if (dx * dx + dy * dy > thr * thr) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const countBeforeUp = activePointers.size;
+            if (pointerDownInfo && pointerDownInfo.id === e.pointerId && countBeforeUp === 1) {
+                const dx = e.clientX - pointerDownInfo.x;
+                const dy = e.clientY - pointerDownInfo.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = performance.now() - pointerDownInfo.t;
+                const thr = pointerDownInfo.pointerType === 'mouse' ? 6 : 12;
+                if (dist <= thr && dt <= 500) {
+                    doPick(e.clientX, e.clientY, pointerDownInfo.pointerType);
+                }
+            }
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+
+        renderer.domElement.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('pointercancel', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size === 0) pointerDownInfo = null;
+        });
+        window.addEventListener('blur', () => {
+            activePointers.clear();
+            pointerDownInfo = null;
+        });
+
+        // iOS Safari 页面级双指缩放拦截
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(evtName => {
+            document.addEventListener(evtName, (e) => e.preventDefault(), { passive: false });
+        });
+
+        // 控制面板阻止事件冒泡到 canvas
+        const controlCard = document.querySelector('.control-card');
+        controlCard.addEventListener('pointerdown', (e) => e.stopPropagation());
+        controlCard.addEventListener('pointermove', (e) => e.stopPropagation());
+
+        // ============================================================
+        // 相机自适应（横竖屏 / 窄屏）
+        //   丁二烯内容约 14 × 10（含两端氢、旋转后摆动、边距）
+        // ============================================================
+        function updateCameraZoom() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const dist = camera.position.distanceTo(controls.target);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+            const baseVisibleH = 2 * dist * Math.tan(fovRad);
+            const baseVisibleW = baseVisibleH * aspect;
+
+            const contentW = 14;
+            const contentH = 10;
+
+            const zoomForW = baseVisibleW / contentW;
+            const zoomForH = baseVisibleH / contentH;
+
+            const isLandscape = aspect > 1;
+            const maxZoom = isLandscape ? 1.0 : 0.95;
+            const minZoom = isLandscape ? 0.55 : 0.30;
+
+            camera.zoom = Math.max(minZoom, Math.min(maxZoom, zoomForW, zoomForH));
+            camera.updateProjectionMatrix();
+        }
+        updateCameraZoom();
+
+        // --- 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 窗口 / 屏幕变化 ---
+        let resizeTimer = null;
+        function onWindowResize() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                updateCameraZoom();
+            }, 60);
+        }
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 300));
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onWindowResize);
+        }
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>

@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>球体分割 · 极简触屏版</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Microsoft YaHei', sans-serif; 
+            background-color: white; 
+            touch-action: pan-y pinch-zoom;
+        }
+        
+        /* 所有非必要的文字板块已完全移除 */
+        
+        /* 极简提示 - 几乎看不见 */
+        .hint-tiny {
+            position: absolute;
+            bottom: 70px;
+            left: 12px;
+            background: rgba(255,255,255,0.3);
+            backdrop-filter: blur(2px);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 9px;
+            color: #888;
+            border: 1px solid #ddd;
+            opacity: 0.4;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        /* 底部开关容器 - 超薄设计 */
+        .toggle-container {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 200;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(16px);
+            padding: 8px 16px;
+            border-radius: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #ccc;
+            /* 极致轻薄 */
+            line-height: 0;
+        }
+        
+        /* 开关项 - 更紧凑 */
+        .toggle-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 30px;
+            transition: all 0.15s ease;
+            min-width: 60px;
+            background: rgba(240,240,240,0.4);
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .toggle-item:hover {
+            background: rgba(210,210,210,0.6);
+            transform: translateY(-1px);
+        }
+        
+        .toggle-item .label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        
+        .toggle-item .indicator {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            box-shadow: 0 2px 6px rgba(76, 175, 80, 0.4);
+            transition: all 0.15s ease;
+        }
+        
+        .toggle-item .indicator.off {
+            background-color: #f44336;
+            box-shadow: 0 2px 6px rgba(244, 67, 54, 0.4);
+        }
+        
+        /* 球体颜色标识 - 更小 */
+        .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 3px;
+            background-color: #D2691E;
+            border: 1px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        /* 触屏设备上适当调整 */
+        @media (max-width: 768px) {
+            .toggle-container {
+                gap: 8px;
+                padding: 6px 12px;
+                bottom: 20px;
+            }
+            .toggle-item {
+                padding: 3px 6px;
+                min-width: 50px;
+            }
+            .toggle-item .label {
+                font-size: 10px;
+            }
+            .indicator {
+                width: 16px;
+                height: 16px;
+            }
+            .hint-tiny {
+                bottom: 80px;
+                font-size: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 所有文字板块已移除：info、note、instruction都已删除 -->
+    
+    <!-- 几乎看不见的提示 (仅为触屏用户准备) -->
+    <div class="hint-tiny">👆 点开关·点面</div>
+
+    <!-- 四个球体的独立开关 - 超薄设计 -->
+    <div class="toggle-container">
+        <!-- 角球开关 -->
+        <div class="toggle-item" id="toggle-corner">
+            <span class="label"><span class="color-dot"></span>角</span>
+            <span class="indicator" id="indicator-corner"></span>
+        </div>
+        <!-- 棱球开关 -->
+        <div class="toggle-item" id="toggle-edge">
+            <span class="label"><span class="color-dot"></span>棱</span>
+            <span class="indicator" id="indicator-edge"></span>
+        </div>
+        <!-- 面球开关 -->
+        <div class="toggle-item" id="toggle-face">
+            <span class="label"><span class="color-dot"></span>面</span>
+            <span class="indicator" id="indicator-face"></span>
+        </div>
+        <!-- 体心球开关 -->
+        <div class="toggle-item" id="toggle-center">
+            <span class="label"><span class="color-dot"></span>体</span>
+            <span class="indicator" id="indicator-center"></span>
+        </div>
+    </div>
+
+    <script src="libs/three.min.js"></script>
+    <script src="libs/OrbitControls.js"></script>
+
+    <script>
+        window.onload = function() {
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // 调整相机位置以适应新的布局
+            camera.position.set(22, 8, 40);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0xffffff);
+            renderer.localClippingEnabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI;
+            controls.target.set(0, 0, 0);
+            
+            // 触屏优化
+            controls.touchRotate = true;
+            controls.touchZoom = true;
+            controls.touchPan = true;
+
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            
+            const light1 = new THREE.DirectionalLight(0xffffff, 1);
+            light1.position.set(5, 10, 7);
+            scene.add(light1);
+            
+            const light2 = new THREE.DirectionalLight(0xffeedd, 0.8);
+            light2.position.set(-5, 3, -5);
+            scene.add(light2);
+
+            // 用于射线检测的对象数组 - 只包含立方体面
+            const clickableFaces = [];
+
+            // 辅助函数：创建字母标签 (保留，但为了极简不显示)
+            function createLabel(text, x, y, z, color = '#D2691E', bgOpacity = 0.95) {
+                // 为了极简，不添加标签
+                return null;
+            }
+
+            const radius = 1.8;
+            const segments = 48;
+            const uniformColor = 0xD2691E;
+
+            // ========== 上部六个分割球体 (A-F) - 整体下调 Y 坐标 ==========
+            // 原来Y=15.0，现在下调到Y=11.0，降低4个单位
+            const positions = [
+                { x: -11.0, y: 11.0, z: 0 },
+                { x: -6.6, y: 11.0, z: 0 },
+                { x: -2.2, y: 11.0, z: 0 },
+                { x: 2.2, y: 11.0, z: 0 },
+                { x: 6.6, y: 11.0, z: 0 },
+                { x: 11.0, y: 11.0, z: 0 }
+            ];
+
+            // A: 完整球
+            const sphereA = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40 })
+            );
+            sphereA.position.set(positions[0].x, positions[0].y, positions[0].z);
+            scene.add(sphereA);
+            // 不添加标签
+
+            // B: 半球 (X>0)
+            const sphereB = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, -Math.PI/2, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereB.position.set(positions[1].x, positions[1].y, positions[1].z);
+            scene.add(sphereB);
+            const planeB = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeB.position.set(positions[1].x, positions[1].y, positions[1].z);
+            planeB.rotation.y = Math.PI/2;
+            scene.add(planeB);
+
+            // C: 1/4 (X>0, Y>0)
+            const sphereC = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, -Math.PI/2, Math.PI, 0, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereC.position.set(positions[2].x, positions[2].y, positions[2].z);
+            scene.add(sphereC);
+            const planeC1 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, 0, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeC1.position.set(positions[2].x, positions[2].y, positions[2].z);
+            planeC1.rotation.y = Math.PI/2;
+            scene.add(planeC1);
+            const planeC2 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI/2, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeC2.position.set(positions[2].x, positions[2].y, positions[2].z);
+            planeC2.rotation.x = Math.PI/2;
+            scene.add(planeC2);
+
+            // D: 1/8 (第一卦限)
+            const sphereD = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, 0, Math.PI/2, 0, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereD.position.set(positions[3].x, positions[3].y, positions[3].z);
+            scene.add(sphereD);
+            const planeD1 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI/2, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeD1.position.set(positions[3].x, positions[3].y, positions[3].z);
+            planeD1.rotation.y = Math.PI/2;
+            scene.add(planeD1);
+            const planeD2 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI/2, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeD2.position.set(positions[3].x, positions[3].y, positions[3].z);
+            planeD2.rotation.x = Math.PI/2;
+            scene.add(planeD2);
+            const planeD3 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI/2, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeD3.position.set(positions[3].x, positions[3].y, positions[3].z);
+            scene.add(planeD3);
+
+            // E: 3/4 (缺第一卦限)
+            const groupE = new THREE.Group();
+            const sphereE1 = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, Math.PI/2, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereE1.position.set(0, 0, 0);
+            groupE.add(sphereE1);
+            const sphereE2 = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, -Math.PI/2, Math.PI, Math.PI/2, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereE2.position.set(0, 0, 0);
+            groupE.add(sphereE2);
+            const sphereE3 = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, 0, Math.PI/2, Math.PI/2, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereE3.position.set(0, 0, 0);
+            groupE.add(sphereE3);
+            groupE.position.set(positions[4].x, positions[4].y, positions[4].z);
+            scene.add(groupE);
+            
+            const planeE_x1 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, 0, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeE_x1.position.set(positions[4].x, positions[4].y, positions[4].z);
+            planeE_x1.rotation.y = Math.PI/2;
+            scene.add(planeE_x1);
+            const planeE_x2 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeE_x2.position.set(positions[4].x, positions[4].y, positions[4].z);
+            planeE_x2.rotation.y = Math.PI/2;
+            scene.add(planeE_x2);
+            const planeE_y1 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, 0, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeE_y1.position.set(positions[4].x, positions[4].y, positions[4].z);
+            planeE_y1.rotation.x = Math.PI/2;
+            scene.add(planeE_y1);
+            const planeE_y2 = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeE_y2.position.set(positions[4].x, positions[4].y, positions[4].z);
+            planeE_y2.rotation.x = Math.PI/2;
+            scene.add(planeE_y2);
+
+            // F: 7/8 (缺第八卦限)
+            const groupF = new THREE.Group();
+            const sphereF1 = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, -Math.PI/2, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereF1.position.set(0, 0, 0);
+            groupF.add(sphereF1);
+            const sphereF2 = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, Math.PI/2, Math.PI, 0, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereF2.position.set(0, 0, 0);
+            groupF.add(sphereF2);
+            const sphereF3 = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, segments, segments, Math.PI/2, Math.PI/2, Math.PI/2, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            sphereF3.position.set(0, 0, 0);
+            groupF.add(sphereF3);
+            groupF.rotation.x = Math.PI;
+            groupF.position.set(positions[5].x, positions[5].y, positions[5].z);
+            scene.add(groupF);
+            
+            const planeF1a = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, 0, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeF1a.position.set(positions[5].x, positions[5].y, positions[5].z);
+            planeF1a.rotation.y = Math.PI/2;
+            planeF1a.rotation.x = Math.PI;
+            scene.add(planeF1a);
+            const planeF1b = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeF1b.position.set(positions[5].x, positions[5].y, positions[5].z);
+            planeF1b.rotation.y = Math.PI/2;
+            planeF1b.rotation.x = Math.PI;
+            scene.add(planeF1b);
+            const planeF2a = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, 0, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeF2a.position.set(positions[5].x, positions[5].y, positions[5].z);
+            planeF2a.rotation.x = Math.PI/2 + Math.PI;
+            scene.add(planeF2a);
+            const planeF2b = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeF2b.position.set(positions[5].x, positions[5].y, positions[5].z);
+            planeF2b.rotation.x = Math.PI/2 + Math.PI;
+            scene.add(planeF2b);
+            const planeF3a = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, 0, Math.PI/2),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeF3a.position.set(positions[5].x, positions[5].y, positions[5].z);
+            planeF3a.rotation.x = Math.PI;
+            scene.add(planeF3a);
+            const planeF3b = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 32, Math.PI, Math.PI),
+                new THREE.MeshPhongMaterial({ color: uniformColor, shininess: 40, side: THREE.DoubleSide })
+            );
+            planeF3b.position.set(positions[5].x, positions[5].y, positions[5].z);
+            planeF3b.rotation.x = Math.PI;
+            scene.add(planeF3b);
+
+            // ========== 晶胞：等比例放大并向下移动 ==========
+            // 立方体边长从9.0增加到11.0，实现等比例放大
+            const a = 11.0;
+            const half = a / 2;
+            
+            // 立方体向下移动：原来中心在Y=0，现在下移到Y = -2.5
+            const cubeYOffset = -2.5;
+
+            // 球体材质
+            const sphereMat = new THREE.MeshPhongMaterial({ 
+                color: uniformColor, 
+                shininess: 40,
+                side: THREE.DoubleSide
+            });
+
+            // 辅助函数：添加球体
+            function addSphere(x, y, z) {
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(radius, 48, 32),
+                    sphereMat.clone()
+                );
+                sphere.position.set(x, y + cubeYOffset, z); // 应用Y轴偏移
+                sphere.userData.isCubeSphere = true;
+                scene.add(sphere);
+                return sphere;
+            }
+
+            // 存储四个球体的引用
+            const spheres = {};
+
+            // 添加四个球体 (应用Y轴偏移)
+            spheres.corner = addSphere(-half, half, half);  // 角球
+            spheres.edge = addSphere(-half, half, 0);       // 棱球
+            spheres.face = addSphere(-half, 0, 0);          // 面球
+            spheres.center = addSphere(0, 0, 0);            // 体心球
+
+            // 添加六个深绿色半透明面 - 应用Y轴偏移
+            const planeMat = new THREE.MeshPhongMaterial({
+                color: 0x226622,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.45,
+                emissive: 0x112211
+            });
+
+            const planeSize = a;
+            
+            const leftPlane = new THREE.Mesh(new THREE.PlaneGeometry(planeSize, planeSize), planeMat.clone());
+            leftPlane.position.set(-half, 0 + cubeYOffset, 0);
+            leftPlane.rotation.y = Math.PI / 2;
+            leftPlane.userData.isCubeFace = true;
+            scene.add(leftPlane);
+            clickableFaces.push(leftPlane);
+            
+            const rightPlane = new THREE.Mesh(new THREE.PlaneGeometry(planeSize, planeSize), planeMat.clone());
+            rightPlane.position.set(half, 0 + cubeYOffset, 0);
+            rightPlane.rotation.y = -Math.PI / 2;
+            rightPlane.userData.isCubeFace = true;
+            scene.add(rightPlane);
+            clickableFaces.push(rightPlane);
+            
+            const bottomPlane = new THREE.Mesh(new THREE.PlaneGeometry(planeSize, planeSize), planeMat.clone());
+            bottomPlane.position.set(0, -half + cubeYOffset, 0);
+            bottomPlane.rotation.x = Math.PI / 2;
+            bottomPlane.userData.isCubeFace = true;
+            scene.add(bottomPlane);
+            clickableFaces.push(bottomPlane);
+            
+            const topPlane = new THREE.Mesh(new THREE.PlaneGeometry(planeSize, planeSize), planeMat.clone());
+            topPlane.position.set(0, half + cubeYOffset, 0);
+            topPlane.rotation.x = -Math.PI / 2;
+            topPlane.userData.isCubeFace = true;
+            scene.add(topPlane);
+            clickableFaces.push(topPlane);
+            
+            const backPlane = new THREE.Mesh(new THREE.PlaneGeometry(planeSize, planeSize), planeMat.clone());
+            backPlane.position.set(0, 0 + cubeYOffset, -half);
+            backPlane.rotation.y = Math.PI;
+            backPlane.userData.isCubeFace = true;
+            scene.add(backPlane);
+            clickableFaces.push(backPlane);
+            
+            const frontPlane = new THREE.Mesh(new THREE.PlaneGeometry(planeSize, planeSize), planeMat.clone());
+            frontPlane.position.set(0, 0 + cubeYOffset, half);
+            frontPlane.rotation.y = 0;
+            frontPlane.userData.isCubeFace = true;
+            scene.add(frontPlane);
+            clickableFaces.push(frontPlane);
+
+            // 棱边 (灰色) - 应用Y轴偏移
+            const edgeColor = 0x666666;
+            const edgeThickness = 0.06; // 稍微加粗以适应更大的立方体
+            
+            const corners = [
+                [-half, -half, -half],
+                [ half, -half, -half],
+                [ half,  half, -half],
+                [-half,  half, -half],
+                [-half, -half,  half],
+                [ half, -half,  half],
+                [ half,  half,  half],
+                [-half,  half,  half]
+            ];
+            
+            const edgePairs = [
+                [0,1], [1,2], [2,3], [3,0],
+                [4,5], [5,6], [6,7], [7,4],
+                [0,4], [1,5], [2,6], [3,7]
+            ];
+            
+            edgePairs.forEach(pair => {
+                const start = corners[pair[0]];
+                const end = corners[pair[1]];
+                const startVec = new THREE.Vector3(start[0], start[1] + cubeYOffset, start[2]);
+                const endVec = new THREE.Vector3(end[0], end[1] + cubeYOffset, end[2]);
+                
+                const dir = new THREE.Vector3().subVectors(endVec, startVec);
+                const len = dir.length();
+                
+                const cylinder = new THREE.Mesh(
+                    new THREE.CylinderGeometry(edgeThickness, edgeThickness, len, 6),
+                    new THREE.MeshPhongMaterial({ color: edgeColor, shininess: 30 })
+                );
+                
+                const mid = new THREE.Vector3().addVectors(startVec, endVec).multiplyScalar(0.5);
+                cylinder.position.copy(mid);
+                
+                cylinder.quaternion.setFromUnitVectors(
+                    new THREE.Vector3(0, 1, 0),
+                    dir.clone().normalize()
+                );
+                
+                scene.add(cylinder);
+            });
+
+            // 添加淡淡的线框 - 应用Y轴偏移
+            const wireframeBox = new THREE.LineSegments(
+                new THREE.EdgesGeometry(new THREE.BoxGeometry(a, a, a)),
+                new THREE.LineBasicMaterial({ color: 0x999999 })
+            );
+            wireframeBox.position.set(0, cubeYOffset, 0);
+            scene.add(wireframeBox);
+
+            // ========== 四个球体的开关逻辑 (支持触屏) ==========
+            // 初始化所有球体为可见
+            for (let key in spheres) {
+                spheres[key].visible = true;
+            }
+
+            // 获取DOM元素
+            const toggleCorner = document.getElementById('toggle-corner');
+            const toggleEdge = document.getElementById('toggle-edge');
+            const toggleFace = document.getElementById('toggle-face');
+            const toggleCenter = document.getElementById('toggle-center');
+            
+            const indicatorCorner = document.getElementById('indicator-corner');
+            const indicatorEdge = document.getElementById('indicator-edge');
+            const indicatorFace = document.getElementById('indicator-face');
+            const indicatorCenter = document.getElementById('indicator-center');
+
+            // 开关状态
+            const states = {
+                corner: true,
+                edge: true,
+                face: true,
+                center: true
+            };
+
+            // 开关点击处理函数 (同时支持鼠标和触屏)
+            function setupToggle(element, indicator, sphereKey) {
+                function toggleHandler(event) {
+                    event.preventDefault();
+                    states[sphereKey] = !states[sphereKey];
+                    spheres[sphereKey].visible = states[sphereKey];
+                    
+                    if (states[sphereKey]) {
+                        indicator.classList.remove('off');
+                    } else {
+                        indicator.classList.add('off');
+                    }
+                }
+                
+                element.addEventListener('click', toggleHandler);
+                element.addEventListener('touchstart', toggleHandler, { passive: false });
+            }
+
+            setupToggle(toggleCorner, indicatorCorner, 'corner');
+            setupToggle(toggleEdge, indicatorEdge, 'edge');
+            setupToggle(toggleFace, indicatorFace, 'face');
+            setupToggle(toggleCenter, indicatorCenter, 'center');
+
+            // ========== 射线检测和点击交互 (仅针对立方体面,支持触屏) ==========
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            // 记录原始颜色用于闪烁效果
+            const originalColors = new Map();
+            
+            function flashObject(obj) {
+                if (!obj.material) return;
+                
+                if (!originalColors.has(obj)) {
+                    if (Array.isArray(obj.material)) {
+                        originalColors.set(obj, obj.material.map(m => m.color.clone()));
+                    } else {
+                        originalColors.set(obj, obj.material.color.clone());
+                    }
+                }
+                
+                if (Array.isArray(obj.material)) {
+                    obj.material.forEach(m => m.color.setHex(0xff0000));
+                } else {
+                    obj.material.color.setHex(0xff0000);
+                }
+                
+                setTimeout(() => {
+                    if (obj.parent) {
+                        const colors = originalColors.get(obj);
+                        if (colors) {
+                            if (Array.isArray(obj.material)) {
+                                obj.material.forEach((m, i) => m.color.copy(colors[i]));
+                            } else {
+                                obj.material.color.copy(colors);
+                            }
+                        }
+                    }
+                }, 200);
+            }
+            
+            function toggleVisibility(obj) {
+                obj.visible = !obj.visible;
+                flashObject(obj);
+            }
+
+            function onPick(event) {
+                event.preventDefault();
+                
+                const rect = renderer.domElement.getBoundingClientRect();
+                let clientX, clientY;
+                
+                if (event.touches) {
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    clientX = event.clientX;
+                    clientY = event.clientY;
+                }
+                
+                mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                
+                const intersects = raycaster.intersectObjects(clickableFaces);
+                
+                if (intersects.length > 0) {
+                    const clickedObj = intersects[0].object;
+                    toggleVisibility(clickedObj);
+                }
+            }
+            
+            renderer.domElement.addEventListener('click', onPick);
+            renderer.domElement.addEventListener('touchstart', onPick, { passive: false });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        };
+    </script>
+
+<div id="__backHome" onclick="location.href='index.html'" title="返回模型目录"
+ style="position:fixed!important;top:14px!important;right:14px!important;z-index:2147483647!important;
+ display:flex!important;align-items:center!important;gap:6px!important;padding:8px 15px 8px 13px!important;
+ border-radius:999px!important;background:rgba(18,18,26,.78)!important;color:#fff!important;
+ font:600 13px/1 system-ui,-apple-system,'Microsoft YaHei',sans-serif!important;letter-spacing:.3px!important;
+ border:1px solid rgba(255,255,255,.35)!important;box-shadow:0 3px 12px rgba(0,0,0,.28)!important;
+ cursor:pointer!important;user-select:none!important;backdrop-filter:blur(8px)!important;
+ -webkit-backdrop-filter:blur(8px)!important;opacity:.72!important;transition:opacity .2s,transform .2s!important;
+ margin:0!important;text-decoration:none!important;white-space:nowrap!important"
+ onmouseover="this.style.opacity=1;this.style.transform='scale(1.04)'"
+ onmouseout="this.style.opacity=.72;this.style.transform='scale(1)'">&larr; 返回目录</div>
+</body>
+</html>
