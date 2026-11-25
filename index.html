@@ -3,14 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<title>六元环的高中化学 3D 结构模型库 · 离线包</title>
+<title>六元环的化学 3D 结构模型库</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;font-family:"Microsoft Yahei",sans-serif}
   body{background:linear-gradient(145deg,#fdfaff,#f0f7ff);min-height:100vh;display:flex;flex-direction:column}
   .top-bar{background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;padding:24px;box-shadow:0 6px 20px rgba(124,58,237,.15);text-align:center;border-radius:0 0 24px 24px}
   .top-bar h1{font-size:clamp(16px,4.3vw,28px);font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center;line-height:1.3;padding:0 8px}
   .sub-nav{display:flex;justify-content:center;gap:22px;margin-top:12px;font-size:14px;opacity:.95;flex-wrap:wrap}
-  .open-badge{background:rgba(255,255,255,.25);padding:6px 18px;border-radius:99px;font-size:13px;margin-top:12px}
   
   /* 搜索栏样式 */
   .search-wrap{max-width:600px;margin:20px auto 0;padding:0 20px;width:100%}
@@ -43,7 +42,7 @@
 </head>
 <body>
 <div class="top-bar">
-  <h1>六元环的高中化学 3D 结构模型库</h1>
+  <h1>六元环的化学 3D 结构模型库</h1>
   <div class="sub-nav">
     <span>🧊 晶体结构 & 堆积方式</span>
     <span>⚛️ 电子云 & 原子轨道</span>
@@ -51,7 +50,6 @@
     <span>🔷 其他物质的结构</span>
     <span>📈 溶液平衡曲线和化学数据</span>
   </div>
-  <div class="open-badge">📦 离线版 · 断网可用 · 97 个模型已存本机</div>
 </div>
 <!-- 搜索框+搜索按钮 -->
 <div class="search-wrap">
@@ -82,7 +80,7 @@
     <div class="card-grid" id="curveGrid"></div>
   </div>
 </div>
-<footer>📦 离线包 · 无需联网 · 双击 index.html 即可使用 · 鼠标左键拖动旋转 / 滚轮缩放</footer>
+<footer>鼠标左键拖动旋转 / 滚轮缩放 · 手机可用单指旋转、双指缩放</footer>
 <script>
 const modelData = {
   crystal: [
