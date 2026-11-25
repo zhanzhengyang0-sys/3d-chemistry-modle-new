@@ -1,8 +1,10 @@
-# 六元环的高中化学 · 3D 结构模型库
+# 六元环的化学 · 3D 结构模型库
 
-一个**纯静态、零依赖、可离线**的高中化学 3D 结构模型库，共 **97 个交互式模型**，打开网页即可用鼠标旋转、滚轮缩放，适合课堂投屏与课后自学。
+一个**纯静态、零依赖**的化学 3D 结构模型库，共 **97 个交互式模型**，打开网页即可用鼠标旋转、滚轮缩放，适合课堂投屏与课后自学。
 
-> 在线访问：<https://zhanzhengyang0-sys.github.io/3d-chemistry-modle-new/>
+> 🚀 在线访问（国内直连）：<https://theoretical-weasel-d4cxi826e0a03-1541628242.tcloudbaseapp.com/>
+>
+> 🌍 备用镜像：<https://zhanzhengyang0-sys.github.io/3d-chemistry-modle-new/>
 >
 > 仓库地址：<https://github.com/zhanzhengyang0-sys/3d-chemistry-modle-new>
 
@@ -18,12 +20,17 @@
 | 🔷 其他物质的结构 | 27 | 碳纳米管、白磷、黑磷、S₈、SF₆、冠醚、DNA、MOF、配离子 |
 | 📈 数据与曲线 | 1 | 溶液离子平衡曲线 |
 
-- **完全离线**：three.js 运行库、样式、图片全部内置，断网可用，不请求任何 CDN。
-- **零安装**：无需 Node、无需构建，双击 `index.html` 就能运行。
+- **资源全部内置**：three.js 运行库、样式、图片均随站点一起托管，不请求任何第三方 CDN，内网或断网环境同样可用。
+- **零安装**：无需 Node、无需构建，浏览器直接打开即可运行。
 - **双主题**：右上角可切换「☀ 纯白模式 / 🌙 星空模式」，选择会被记住，投屏时用纯白模式最稳。
 - **即时搜索**：首页搜索框按名称过滤并定位到对应分类。
+- **移动端可用**：单指旋转、双指缩放，手机和平板都做了适配。
 
-## 🚀 本地使用
+## 🚀 使用方式
+
+**在线**：直接打开上面的访问地址，点击卡片即可进入模型。
+
+**本地**：
 
 1. 下载或克隆本仓库；
 2. 用 Chrome / Edge 打开根目录的 `index.html`；
@@ -46,16 +53,25 @@
 
 ## 🌐 部署说明
 
-本站通过 **GitHub Pages** 发布，源为 `main` 分支根目录：
+同一套静态文件部署在两个平台，互为备份：
 
-- 访问地址：<https://zhanzhengyang0-sys.github.io/3d-chemistry-modle-new/>
-- 所有页面内部链接均为**相对路径**，因此放在仓库子路径下也能正常工作；
-- `.nojekyll` 用于跳过 Jekyll 构建，避免静态资源被额外处理。
+| 平台 | 地址 | 定位 |
+| --- | --- | --- |
+| 腾讯云 CloudBase 静态托管 | <https://theoretical-weasel-d4cxi826e0a03-1541628242.tcloudbaseapp.com/> | **国内主力**，上海节点，CDN 加速 |
+| GitHub Pages | <https://zhanzhengyang0-sys.github.io/3d-chemistry-modle-new/> | 海外备用 |
 
-如需更新：直接替换或新增 HTML 文件，并在 `index.html` 的 `modelData` 中登记条目即可，推送后约 1 分钟自动生效。
+所有页面内部链接均为**相对路径**，因此放在仓库子路径或独立域名下都能正常工作；`.nojekyll` 用于跳过 Jekyll 构建，避免静态文件被额外处理。
+
+**更新流程**：
+
+1. 修改或新增 HTML 文件；新增模型需同时在 `index.html` 的 `modelData` 中登记条目；
+2. CloudBase：执行 `tcb hosting deploy <站点目录> -e theoretical-weasel-d4cxi826e0a03` 或使用仓库根目录的部署脚本；
+3. GitHub Pages：推送到 `main` 分支，约 1 分钟后自动重建。
+
+> 文件名建议保持英文、数字、下划线，中文字符在部分对象存储服务上可能被拒绝。
 
 ## 🙏 声明
 
-模型内容来源于**小虎的高中化学 3D 结构模型库**，本项目仅做离线打包与静态托管整理，用于教学与学习交流；如涉及版权问题请联系作者处理。
+模型内容来源于**小虎的高中化学 3D 结构模型库**，本项目仅做静态托管与打包整理，用于教学与学习交流；如涉及版权问题请联系作者处理。
 
 3D 渲染基于 [three.js](https://threejs.org/)（MIT License）。
